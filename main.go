@@ -32,6 +32,11 @@ func main() {
 	}
 
 	xbus := service.NewXBus(&cfg.Xbus)
+	if err := xbus.Init(); err != nil {
+		glog.Errorf("init xbus fail: %v", err)
+		return
+	}
+
 	api_server := api.NewAPIServer(&cfg.Api, xbus)
 	if err := api_server.Start(); err != nil {
 		glog.Errorf("start api_sersver fail: %v", err)
