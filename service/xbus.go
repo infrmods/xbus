@@ -21,8 +21,8 @@ type Config struct {
 }
 
 type XBus struct {
-	config      Config
-	etcd_client *clientv3.Client
+	config     Config
+	etcdClient *clientv3.Client
 }
 
 func NewXBus(config *Config) *XBus {
@@ -38,7 +38,7 @@ func (xbus *XBus) Init() (err error) {
 		Endpoints:   xbus.config.EtcdEndpoints,
 		DialTimeout: xbus.config.EtcdTimeout,
 		TLS:         xbus.config.EtcdTLS}
-	if xbus.etcd_client, err = clientv3.New(etcd_config); err == nil {
+	if xbus.etcdClient, err = clientv3.New(etcd_config); err == nil {
 		return nil
 	} else {
 		return fmt.Errorf("create etcd clientv3 fail(%v)", err)
@@ -57,32 +57,58 @@ func checkNameVersion(name, version string) error {
 	return nil
 }
 
+var rValidServiceId = regexp.MustCompile(`(?i)[a-f0-9]+`)
+
+func checkServiceId(id string) error {
+	if !rValidServiceId.MatchString(id) {
+		return comm.NewError(comm.EcodeInvalidServiceId, "")
+	}
+	return nil
+}
+
 func (xbus *XBus) Plug(ctx context.Context, name, version string,
-	ttl time.Duration, endpoint *comm.ServiceEndpoint) (string, error) {
+	ttl time.Duration, endpoint *comm.ServiceEndpoint) (string, clientv3.LeaseID, error) {
 	if err := checkNameVersion(name, version); err != nil {
-		return "", err
+		return "", 0, err
 	}
 	if endpoint.Type == "" {
-		return "", comm.NewError(comm.EcodeInvalidEndpoint, "missing type")
+		return "", 0, comm.NewError(comm.EcodeInvalidEndpoint, "missing type")
 	}
 	if endpoint.Address == "" {
-		return "", comm.NewError(comm.EcodeInvalidEndpoint, "missing address")
+		return "", 0, comm.NewError(comm.EcodeInvalidEndpoint, "missing address")
 	}
 	data, err := json.Marshal(endpoint)
 	if err != nil {
 		glog.Errorf("marchal endpoint(%#v) fail: %v", endpoint, err)
-		return "", comm.NewError(comm.EcodeSystemError, "marchal endpoint fail")
+		return "", 0, comm.NewError(comm.EcodeSystemError, "marchal endpoint fail")
 	}
-	return xbus.newUniqueEphemeralNode(ttl, xbus.etcdKeyPrefix(name, version), data)
+	return xbus.newUniqueEphemeralNode(ctx, ttl, xbus.etcdKeyPrefix(name, version), string(data))
 }
 
 func (xbus *XBus) Unplug(ctx context.Context, name, version, id string) error {
 	if err := checkNameVersion(name, version); err != nil {
 		return err
 	}
-	if _, err := xbus.etcd_client.Delete(ctx, xbus.etcdKey(name, version, id)); err != nil {
+	if err := checkServiceId(id); err != nil {
+		return err
+	}
+	if _, err := xbus.etcdClient.Delete(ctx, xbus.etcdKey(name, version, id)); err != nil {
 		glog.Errorf("delete key(%s) fail: %v", xbus.etcdKey(name, version, id), err)
 		return comm.NewError(comm.EcodeSystemError, "delete key fail")
+	}
+	return nil
+}
+
+func (xbus *XBus) Keepalive(ctx context.Context, name, version, id string, keepId clientv3.LeaseID) error {
+	if err := checkNameVersion(name, version); err != nil {
+		return err
+	}
+	if err := checkServiceId(id); err != nil {
+		return err
+	}
+	if _, err := xbus.etcdClient.Lease.KeepAliveOnce(ctx, keepId); err != nil {
+		// TODO: err detail
+		return comm.NewError(comm.EcodeMissing, "")
 	}
 	return nil
 }
