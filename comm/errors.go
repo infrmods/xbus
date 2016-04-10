@@ -11,7 +11,7 @@ const (
 	EcodeInvalidServiceId = "invalid-service-id"
 	EcodeInvalidEndpoint  = "invalid-endpoint"
 	EcodeLoopExceeded     = "loop-exceeded"
-	EcodeMissing          = "missing"
+	EcodeNotFound         = "not-found"
 )
 
 type Error struct {

@@ -8,6 +8,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/comm"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"regexp"
 	"strings"
 	"time"
@@ -82,7 +84,7 @@ func (xbus *XBus) Plug(ctx context.Context, name, version string,
 		glog.Errorf("marchal endpoint(%#v) fail: %v", endpoint, err)
 		return "", 0, comm.NewError(comm.EcodeSystemError, "marchal endpoint fail")
 	}
-	return xbus.newUniqueEphemeralNode(ctx, ttl, xbus.etcdKeyPrefix(name, version), string(data))
+	return xbus.newUniqueNode(ctx, ttl, xbus.etcdKeyPrefix(name, version), string(data))
 }
 
 func (xbus *XBus) Unplug(ctx context.Context, name, version, id string) error {
@@ -107,8 +109,11 @@ func (xbus *XBus) Keepalive(ctx context.Context, name, version, id string, keepI
 		return err
 	}
 	if _, err := xbus.etcdClient.Lease.KeepAliveOnce(ctx, keepId); err != nil {
-		// TODO: err detail
-		return comm.NewError(comm.EcodeMissing, "")
+		if grpc.Code(err) == codes.NotFound {
+			return comm.NewError(comm.EcodeNotFound, "")
+		}
+		glog.Errorf("KeepAliveOnce(%d) fail: %v", keepId, err)
+		return comm.NewError(comm.EcodeSystemError, "")
 	}
 	return nil
 }
