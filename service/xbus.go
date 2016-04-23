@@ -118,16 +118,44 @@ func (xbus *XBus) Keepalive(ctx context.Context, name, version, id string, keepI
 	return nil
 }
 
-func (xbus *XBus) Query(ctx context.Context, name, version string) ([]comm.ServiceEndpoint, error) {
+func (xbus *XBus) Query(ctx context.Context, name, version string) ([]comm.ServiceEndpoint, int64, error) {
 	if err := checkNameVersion(name, version); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return nil, nil
+	key := xbus.etcdKeyPrefix(name, version)
+	return xbus.query(ctx, key)
 }
 
-func (xbux *XBus) Watch(ctx context.Context, name, version string, timeout time.Duration) ([]comm.ServiceEndpoint, error) {
-	if err := checkNameVersion(name, version); err != nil {
-		return nil, err
+func (xbus *XBus) query(ctx context.Context, key string) ([]comm.ServiceEndpoint, int64, error) {
+	if resp, err := xbus.etcdClient.Get(ctx, key); err == nil {
+		if endpoints, err := xbus.makeEndpoints(resp.Kvs); err == nil {
+			return endpoints, resp.Header.Revision, nil
+		} else {
+			return nil, 0, err
+		}
+	} else {
+		if grpc.Code(err) == codes.NotFound {
+			return nil, 0, comm.NewError(comm.EcodeNotFound, "")
+		}
+		glog.Errorf("Query(%s) fail: %v", key, err)
+		return nil, 0, comm.NewError(comm.EcodeSystemError, "")
 	}
-	return nil, nil
+}
+
+func (xbus *XBus) Watch(ctx context.Context, name, version string,
+	timeout time.Duration) ([]comm.ServiceEndpoint, int64, error) {
+	if err := checkNameVersion(name, version); err != nil {
+		return nil, 0, err
+	}
+	key := xbus.etcdKeyPrefix(name, version)
+	watcher := clientv3.NewWatcher(xbus.etcdClient)
+	defer watcher.Close()
+	tCtx, cancelFunc := context.WithTimeout(ctx, timeout)
+	defer cancelFunc()
+	watchCh := watcher.Watch(tCtx, key)
+	resp := <-watchCh
+	if !resp.Canceled {
+		return xbus.query(tCtx, key)
+	}
+	return nil, 0, nil
 }

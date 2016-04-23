@@ -3,34 +3,46 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "+rGsSdfZ3JBuPxx0JSap2ZaLxQQ=",
+			"checksumSHA1": "QYZl71hihzMItJ9UrxlZbqLbtUQ=",
+			"path": "github.com/cloudfoundry-incubator/candiedyaml",
+			"revision": "479485e9bfc69ee37d074b36ce36da5e4fba7941",
+			"revisionTime": "2016-03-28T01:12:34Z"
+		},
+		{
+			"checksumSHA1": "1J3HmBsIcWkjDDcQlACqssjNkP8=",
+			"path": "github.com/coreos/etcd/auth/authpb",
+			"revision": "27480f9ea4385ce3db5e040f931581c808d0604b",
+			"revisionTime": "2016-04-11T03:31:05Z"
+		},
+		{
+			"checksumSHA1": "BLKQvhzg8yI2itBcBf2XxJGZn8g=",
 			"path": "github.com/coreos/etcd/clientv3",
-			"revision": "6770b9c67ae642e01980331f2207f44d0beb4338",
-			"revisionTime": "2016-04-03T04:13:46Z"
+			"revision": "27480f9ea4385ce3db5e040f931581c808d0604b",
+			"revisionTime": "2016-04-11T03:31:05Z"
 		},
 		{
-			"checksumSHA1": "ZfbiKADfWpuvTyvAhAkJQDcL+K4=",
+			"checksumSHA1": "XgJNb/4uW946Rv28AKaOI5TWVRA=",
 			"path": "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
-			"revision": "6770b9c67ae642e01980331f2207f44d0beb4338",
-			"revisionTime": "2016-04-03T04:13:46Z"
+			"revision": "27480f9ea4385ce3db5e040f931581c808d0604b",
+			"revisionTime": "2016-04-11T03:31:05Z"
 		},
 		{
-			"checksumSHA1": "L+UTOydyEFxUaN1NfV7pFVU5h+4=",
+			"checksumSHA1": "68/H0cQGPPRca4jSkLq2T7wzuXo=",
 			"path": "github.com/coreos/etcd/etcdserver/etcdserverpb",
-			"revision": "6770b9c67ae642e01980331f2207f44d0beb4338",
-			"revisionTime": "2016-04-03T04:13:46Z"
+			"revision": "27480f9ea4385ce3db5e040f931581c808d0604b",
+			"revisionTime": "2016-04-11T03:31:05Z"
 		},
 		{
 			"checksumSHA1": "b6AhrsQdPI51SIuFKAchhkuZUO4=",
 			"path": "github.com/coreos/etcd/pkg/tlsutil",
-			"revision": "6770b9c67ae642e01980331f2207f44d0beb4338",
-			"revisionTime": "2016-04-03T04:13:46Z"
+			"revision": "27480f9ea4385ce3db5e040f931581c808d0604b",
+			"revisionTime": "2016-04-11T03:31:05Z"
 		},
 		{
-			"checksumSHA1": "9lpfO4ddJ9jd4rMLAayt8xMWVWQ=",
+			"checksumSHA1": "UXU+9svBewQZuQIZSDBt85/UdFI=",
 			"path": "github.com/coreos/etcd/storage/storagepb",
-			"revision": "6770b9c67ae642e01980331f2207f44d0beb4338",
-			"revisionTime": "2016-04-03T04:13:46Z"
+			"revision": "27480f9ea4385ce3db5e040f931581c808d0604b",
+			"revisionTime": "2016-04-11T03:31:05Z"
 		},
 		{
 			"checksumSHA1": "imR2wF388/0fBU6RRWx8RvTi8Q8=",
@@ -49,6 +61,12 @@
 			"path": "github.com/facebookgo/stats",
 			"revision": "1b76add642e42c6ffba7211ad7b3939ce654526e",
 			"revisionTime": "2015-10-06T22:16:25Z"
+		},
+		{
+			"checksumSHA1": "KOThXqDanFZmWCmJsOGrpVIdpPo=",
+			"path": "github.com/ghodss/yaml",
+			"revision": "1a6f069841556a7bcaff4a397ca6e8328d266c2f",
+			"revisionTime": "2016-03-07T21:52:05Z"
 		},
 		{
 			"checksumSHA1": "RFJgRr9hdt3rAZ/ZyhkpXAlTS8Q=",
@@ -167,6 +185,12 @@
 		{
 			"checksumSHA1": "3Lt5hNAG8qJAYSsNghR5uA1zQns=",
 			"path": "google.golang.org/grpc/grpclog",
+			"revision": "5aeebcd810669f5d8e682b352ad8128b253d21f8",
+			"revisionTime": "2016-04-01T21:03:47Z"
+		},
+		{
+			"checksumSHA1": "T3Q0p8kzvXFnRkMaK/G8mCv6mc0=",
+			"path": "google.golang.org/grpc/internal",
 			"revision": "5aeebcd810669f5d8e682b352ad8128b253d21f8",
 			"revisionTime": "2016-04-01T21:03:47Z"
 		},

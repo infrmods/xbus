@@ -5,13 +5,14 @@ import (
 )
 
 const (
-	EcodeSystemError      = "system-error"
-	EcodeInvalidName      = "invalid-name"
-	EcodeInvalidVersion   = "invalid-version"
-	EcodeInvalidServiceId = "invalid-service-id"
-	EcodeInvalidEndpoint  = "invalid-endpoint"
-	EcodeLoopExceeded     = "loop-exceeded"
-	EcodeNotFound         = "not-found"
+	EcodeSystemError          = "system-error"
+	EcodeInvalidName          = "invalid-name"
+	EcodeInvalidVersion       = "invalid-version"
+	EcodeInvalidServiceId     = "invalid-service-id"
+	EcodeInvalidEndpoint      = "invalid-endpoint"
+	EcodeDamagedEndpointValue = "damaged-endpoint-value"
+	EcodeLoopExceeded         = "loop-exceeded"
+	EcodeNotFound             = "not-found"
 )
 
 type Error struct {
