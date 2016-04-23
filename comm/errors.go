@@ -6,6 +6,8 @@ import (
 
 const (
 	EcodeSystemError          = "system-error"
+	EcodeInvalidParam         = "invalid-param"
+	EcodeMissingParam         = "missing-param"
 	EcodeInvalidName          = "invalid-name"
 	EcodeInvalidVersion       = "invalid-version"
 	EcodeInvalidServiceId     = "invalid-service-id"

@@ -111,6 +111,12 @@
 			"revisionTime": "2016-03-18T04:49:06Z"
 		},
 		{
+			"checksumSHA1": "hKc7PXhRpqxWXQKrV1klZGkE4I4=",
+			"path": "github.com/labstack/echo/middleware",
+			"revision": "3946a1839c7c7003936cb36f1abcb85042047d6f",
+			"revisionTime": "2016-03-18T04:49:06Z"
+		},
+		{
 			"checksumSHA1": "sV7M270EzTS3wZJ0SvDXehjnfyU=",
 			"path": "github.com/labstack/gommon/color",
 			"revision": "c7a42f4800da9d39225ce15411f48288d622e517",
@@ -163,6 +169,12 @@
 			"path": "golang.org/x/net/trace",
 			"revision": "35b06af0720201bc2f326773a80767387544f8c4",
 			"revisionTime": "2016-03-15T03:00:09Z"
+		},
+		{
+			"checksumSHA1": "c8iMfP5+K3GEg26HJiO0OVVLiM4=",
+			"path": "golang.org/x/sys/unix",
+			"revision": "f64b50fbea64174967a8882830d621a18ee1548e",
+			"revisionTime": "2016-04-14T13:31:22Z"
 		},
 		{
 			"checksumSHA1": "jS0t7be7rUMxyrOOL4ZJMZdDnMk=",

@@ -2,7 +2,6 @@ package service
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
@@ -47,13 +46,14 @@ func (xbus *XBus) Init() (err error) {
 	}
 }
 
-var rValidNameVersion = regexp.MustCompile(`(?i)[a-z_.]+`)
+var rValidName = regexp.MustCompile(`(?i)[a-z][a-z0-9_.]{5,}`)
+var rValidVersion = regexp.MustCompile(`(?i)[a-z0-9][a-z0-9_.]*`)
 
 func checkNameVersion(name, version string) error {
-	if !rValidNameVersion.MatchString(name) {
+	if !rValidName.MatchString(name) {
 		return comm.NewError(comm.EcodeInvalidName, "")
 	}
-	if !rValidNameVersion.MatchString(version) {
+	if !rValidVersion.MatchString(version) {
 		return comm.NewError(comm.EcodeInvalidVersion, "")
 	}
 	return nil
@@ -79,10 +79,9 @@ func (xbus *XBus) Plug(ctx context.Context, name, version string,
 	if endpoint.Address == "" {
 		return "", 0, comm.NewError(comm.EcodeInvalidEndpoint, "missing address")
 	}
-	data, err := json.Marshal(endpoint)
+	data, err := endpoint.Marshal()
 	if err != nil {
-		glog.Errorf("marchal endpoint(%#v) fail: %v", endpoint, err)
-		return "", 0, comm.NewError(comm.EcodeSystemError, "marchal endpoint fail")
+		return "", 0, err
 	}
 	return xbus.newUniqueNode(ctx, ttl, xbus.etcdKeyPrefix(name, version), string(data))
 }
@@ -101,7 +100,36 @@ func (xbus *XBus) Unplug(ctx context.Context, name, version, id string) error {
 	return nil
 }
 
-func (xbus *XBus) Keepalive(ctx context.Context, name, version, id string, keepId clientv3.LeaseID) error {
+func (xbus *XBus) Update(ctx context.Context, name, version, id string, endpoint *comm.ServiceEndpoint) error {
+	if err := checkNameVersion(name, version); err != nil {
+		return err
+	}
+	if err := checkServiceId(id); err != nil {
+		return err
+	}
+	key := xbus.etcdKey(name, version, id)
+	data, err := endpoint.Marshal()
+	if err != nil {
+		return err
+	}
+
+	resp, err := xbus.etcdClient.Txn(
+		ctx,
+	).If(
+		clientv3.Compare(clientv3.Version(key), ">", 0),
+	).Then(clientv3.OpPut(key, string(data))).Commit()
+	if err == nil {
+		if resp.Succeeded {
+			return nil
+		}
+		return comm.NewError(comm.EcodeNotFound, "")
+	} else {
+		glog.Errorf("tnx update(%s) fail: %v", key, err)
+		return comm.NewError(comm.EcodeSystemError, "")
+	}
+}
+
+func (xbus *XBus) KeepAlive(ctx context.Context, name, version, id string, keepId clientv3.LeaseID) error {
 	if err := checkNameVersion(name, version); err != nil {
 		return err
 	}
@@ -143,7 +171,7 @@ func (xbus *XBus) query(ctx context.Context, key string) ([]comm.ServiceEndpoint
 }
 
 func (xbus *XBus) Watch(ctx context.Context, name, version string,
-	timeout time.Duration) ([]comm.ServiceEndpoint, int64, error) {
+	revision int64, timeout time.Duration) ([]comm.ServiceEndpoint, int64, error) {
 	if err := checkNameVersion(name, version); err != nil {
 		return nil, 0, err
 	}
@@ -152,7 +180,7 @@ func (xbus *XBus) Watch(ctx context.Context, name, version string,
 	defer watcher.Close()
 	tCtx, cancelFunc := context.WithTimeout(ctx, timeout)
 	defer cancelFunc()
-	watchCh := watcher.Watch(tCtx, key)
+	watchCh := watcher.Watch(tCtx, key, clientv3.WithRev(revision))
 	resp := <-watchCh
 	if !resp.Canceled {
 		return xbus.query(tCtx, key)

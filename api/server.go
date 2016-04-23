@@ -6,6 +6,7 @@ import (
 	"github.com/infrmods/xbus/service"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/engine/standard"
+	"github.com/labstack/echo/middleware"
 	"time"
 )
 
@@ -28,7 +29,8 @@ func NewAPIServer(config *Config, xbus *service.XBus) *APIServer {
 
 func (server *APIServer) Start() error {
 	e := echo.New()
-	server.registerAPIs(e)
+	e.Use(middleware.Recover())
+	server.registerServiceAPIs(e.Group("/services"))
 	std := standard.New(server.config.Listen)
 	std.SetHandler(e)
 
@@ -44,5 +46,9 @@ func (server *APIServer) Start() error {
 	return nil
 }
 
-func (server *APIServer) registerAPIs(e *echo.Echo) {
+func (server *APIServer) registerServiceAPIs(g *echo.Group) {
+	g.Post("/:name/:version", echo.HandlerFunc(server.Pulg))
+	g.Delete("/:name/:version/:id", echo.HandlerFunc(server.Unplug))
+	g.Put("/:name/:version/:id", echo.HandlerFunc(server.Update))
+	g.Get("/:name/:version", echo.HandlerFunc(server.Query))
 }
