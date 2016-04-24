@@ -1,8 +1,6 @@
-package service
+package services
 
 import (
-	"crypto/tls"
-	"fmt"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/comm"
@@ -13,35 +11,20 @@ import (
 )
 
 type Config struct {
-	EtcdEndpoints []string      `default:"[\"127.0.0.1:2378\"]" yaml:"etcd_endpoints"`
-	EtcdTimeout   time.Duration `default:"5s" yaml:"etcd_timeout"`
-	EtcdTLS       *tls.Config   `yaml:"etcd_tls"`
-	KeyPrefix     string        `default:"/services/"`
+	KeyPrefix string `default:"/services" yaml:"key_prefix"`
 }
 
-type XBus struct {
+type Services struct {
 	config     Config
 	etcdClient *clientv3.Client
 }
 
-func NewXBus(config *Config) *XBus {
-	xbus := &XBus{config: *config}
-	if strings.HasSuffix(xbus.config.KeyPrefix, "/") {
-		xbus.config.KeyPrefix = xbus.config.KeyPrefix[:len(xbus.config.KeyPrefix)-1]
+func NewServices(config *Config, etcdClient *clientv3.Client) *Services {
+	services := &Services{config: *config, etcdClient: etcdClient}
+	if strings.HasSuffix(services.config.KeyPrefix, "/") {
+		services.config.KeyPrefix = services.config.KeyPrefix[:len(services.config.KeyPrefix)-1]
 	}
-	return xbus
-}
-
-func (xbus *XBus) Init() (err error) {
-	etcd_config := clientv3.Config{
-		Endpoints:   xbus.config.EtcdEndpoints,
-		DialTimeout: xbus.config.EtcdTimeout,
-		TLS:         xbus.config.EtcdTLS}
-	if xbus.etcdClient, err = clientv3.New(etcd_config); err == nil {
-		return nil
-	} else {
-		return fmt.Errorf("create etcd clientv3 fail(%v)", err)
-	}
+	return services
 }
 
 var rValidName = regexp.MustCompile(`(?i)[a-z][a-z0-9_.]{5,}`)
@@ -66,7 +49,7 @@ func checkServiceId(id string) error {
 	return nil
 }
 
-func (xbus *XBus) Plug(ctx context.Context, name, version string,
+func (services *Services) Plug(ctx context.Context, name, version string,
 	ttl time.Duration, endpoint *comm.ServiceEndpoint) (string, clientv3.LeaseID, error) {
 	if err := checkNameVersion(name, version); err != nil {
 		return "", 0, err
@@ -81,37 +64,37 @@ func (xbus *XBus) Plug(ctx context.Context, name, version string,
 	if err != nil {
 		return "", 0, err
 	}
-	return xbus.newUniqueNode(ctx, ttl, xbus.etcdKeyPrefix(name, version), string(data))
+	return services.newUniqueNode(ctx, ttl, services.etcdKeyPrefix(name, version), string(data))
 }
 
-func (xbus *XBus) Unplug(ctx context.Context, name, version, id string) error {
+func (services *Services) Unplug(ctx context.Context, name, version, id string) error {
 	if err := checkNameVersion(name, version); err != nil {
 		return err
 	}
 	if err := checkServiceId(id); err != nil {
 		return err
 	}
-	if _, err := xbus.etcdClient.Delete(ctx, xbus.etcdKey(name, version, id)); err != nil {
-		glog.Errorf("delete key(%s) fail: %v", xbus.etcdKey(name, version, id), err)
+	if _, err := services.etcdClient.Delete(ctx, services.etcdKey(name, version, id)); err != nil {
+		glog.Errorf("delete key(%s) fail: %v", services.etcdKey(name, version, id), err)
 		return comm.NewError(comm.EcodeSystemError, "delete key fail")
 	}
 	return nil
 }
 
-func (xbus *XBus) Update(ctx context.Context, name, version, id string, endpoint *comm.ServiceEndpoint) error {
+func (services *Services) Update(ctx context.Context, name, version, id string, endpoint *comm.ServiceEndpoint) error {
 	if err := checkNameVersion(name, version); err != nil {
 		return err
 	}
 	if err := checkServiceId(id); err != nil {
 		return err
 	}
-	key := xbus.etcdKey(name, version, id)
+	key := services.etcdKey(name, version, id)
 	data, err := endpoint.Marshal()
 	if err != nil {
 		return err
 	}
 
-	resp, err := xbus.etcdClient.Txn(
+	resp, err := services.etcdClient.Txn(
 		ctx,
 	).If(
 		clientv3.Compare(clientv3.Version(key), ">", 0),
@@ -122,56 +105,55 @@ func (xbus *XBus) Update(ctx context.Context, name, version, id string, endpoint
 		}
 		return comm.NewError(comm.EcodeNotFound, "")
 	} else {
-		glog.Errorf("tnx update(%s) fail: %v", key, err)
-		return comm.NewError(comm.EcodeSystemError, "")
+		return comm.CleanErr(err, "update fail", "tnx update(%s) fail: %v", key, err)
 	}
 }
 
-func (xbus *XBus) KeepAlive(ctx context.Context, name, version, id string, keepId clientv3.LeaseID) error {
+func (services *Services) KeepAlive(ctx context.Context, name, version, id string, keepId clientv3.LeaseID) error {
 	if err := checkNameVersion(name, version); err != nil {
 		return err
 	}
 	if err := checkServiceId(id); err != nil {
 		return err
 	}
-	if _, err := xbus.etcdClient.Lease.KeepAliveOnce(ctx, keepId); err != nil {
-		return cleanErr(err, "keepalive fail", "KeepAliveOnce(%d) fail: %v", keepId, err)
+	if _, err := services.etcdClient.Lease.KeepAliveOnce(ctx, keepId); err != nil {
+		return comm.CleanErr(err, "keepalive fail", "KeepAliveOnce(%d) fail: %v", keepId, err)
 	}
 	return nil
 }
 
-func (xbus *XBus) Query(ctx context.Context, name, version string) ([]comm.ServiceEndpoint, int64, error) {
+func (services *Services) Query(ctx context.Context, name, version string) ([]comm.ServiceEndpoint, int64, error) {
 	if err := checkNameVersion(name, version); err != nil {
 		return nil, 0, err
 	}
-	key := xbus.etcdKeyPrefix(name, version)
-	return xbus.query(ctx, key)
+	key := services.etcdKeyPrefix(name, version)
+	return services.query(ctx, key)
 }
 
-func (xbus *XBus) query(ctx context.Context, key string) ([]comm.ServiceEndpoint, int64, error) {
-	if resp, err := xbus.etcdClient.Get(ctx, key, clientv3.WithFromKey()); err == nil {
-		if endpoints, err := xbus.makeEndpoints(resp.Kvs); err == nil {
+func (services *Services) query(ctx context.Context, key string) ([]comm.ServiceEndpoint, int64, error) {
+	if resp, err := services.etcdClient.Get(ctx, key, clientv3.WithFromKey()); err == nil {
+		if endpoints, err := services.makeEndpoints(resp.Kvs); err == nil {
 			return endpoints, resp.Header.Revision, nil
 		} else {
 			return nil, 0, err
 		}
 	} else {
-		return nil, 0, cleanErr(err, "query fail", "Query(%s) fail: %v", key, err)
+		return nil, 0, comm.CleanErr(err, "query fail", "Query(%s) fail: %v", key, err)
 	}
 }
 
-func (xbus *XBus) Watch(ctx context.Context, name, version string,
+func (services *Services) Watch(ctx context.Context, name, version string,
 	revision int64) ([]comm.ServiceEndpoint, int64, error) {
 	if err := checkNameVersion(name, version); err != nil {
 		return nil, 0, err
 	}
-	key := xbus.etcdKeyPrefix(name, version)
-	watcher := clientv3.NewWatcher(xbus.etcdClient)
+	key := services.etcdKeyPrefix(name, version)
+	watcher := clientv3.NewWatcher(services.etcdClient)
 	defer watcher.Close()
 	watchCh := watcher.Watch(ctx, key, clientv3.WithRev(revision), clientv3.WithPrefix())
 	resp := <-watchCh
 	if !resp.Canceled {
-		return xbus.query(ctx, key)
+		return services.query(ctx, key)
 	}
 	return nil, 0, nil
 }

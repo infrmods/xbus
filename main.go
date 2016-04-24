@@ -2,16 +2,21 @@ package main
 
 import (
 	"flag"
+	"github.com/coreos/etcd/clientv3"
 	"github.com/gocomm/config"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/api"
-	"github.com/infrmods/xbus/service"
+	"github.com/infrmods/xbus/comm"
+	"github.com/infrmods/xbus/configs"
+	"github.com/infrmods/xbus/services"
 	"gopkg.in/yaml.v2"
 )
 
 type Config struct {
-	Xbus service.Config
-	Api  api.Config
+	Etcd     comm.ETCDConfig
+	Services services.Config
+	Configs  configs.Config
+	Api      api.Config
 }
 
 var cfg_path = flag.String("config", "", "config file path")
@@ -31,18 +36,23 @@ func main() {
 		return
 	}
 
-	xbus := service.NewXBus(&cfg.Xbus)
-	if err := xbus.Init(); err != nil {
-		glog.Errorf("init xbus fail: %v", err)
+	etcdConfig := clientv3.Config{
+		Endpoints:   cfg.Etcd.Endpoints,
+		DialTimeout: cfg.Etcd.Timeout,
+		TLS:         cfg.Etcd.TLS}
+	etcdClient, err := clientv3.New(etcdConfig)
+	if err != nil {
+		glog.Errorf("create etcd clientv3 fail: %v", err)
 		return
 	}
 
-	api_server := api.NewAPIServer(&cfg.Api, xbus)
-	if err := api_server.Start(); err != nil {
+	services := services.NewServices(&cfg.Services, etcdClient)
+	apiServer := api.NewAPIServer(&cfg.Api, services)
+	if err := apiServer.Start(); err != nil {
 		glog.Errorf("start api_sersver fail: %v", err)
 		return
 	}
-	if err := api_server.Wait(); err != nil {
+	if err := apiServer.Wait(); err != nil {
 		glog.Errorf("wait api_server fail: %v", err)
 		return
 	}

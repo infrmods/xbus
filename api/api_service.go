@@ -20,7 +20,7 @@ type PlugResult struct {
 	KeepId    int64  `json:"keep_id"`
 }
 
-func (server *APIServer) Pulg(c echo.Context) error {
+func (server *APIServer) PulgService(c echo.Context) error {
 	ttl, ok, err := IntFormParamD(c, "ttl", 60)
 	if !ok {
 		return err
@@ -36,7 +36,7 @@ func (server *APIServer) Pulg(c echo.Context) error {
 		return JsonErrorf(c, comm.EcodeInvalidEndpoint, "")
 	}
 
-	if sid, kid, err := server.xbus.Plug(context.Background(),
+	if sid, kid, err := server.services.Plug(context.Background(),
 		c.P(0), c.P(1), time.Duration(ttl)*time.Second, &endpoint); err == nil {
 		return JsonResult(c, PlugResult{ServiceId: sid, KeepId: int64(kid)})
 	} else {
@@ -45,15 +45,15 @@ func (server *APIServer) Pulg(c echo.Context) error {
 	return nil
 }
 
-func (server *APIServer) Unplug(c echo.Context) error {
-	if err := server.xbus.Unplug(context.Background(), c.P(0), c.P(1), c.P(2)); err == nil {
+func (server *APIServer) UnplugService(c echo.Context) error {
+	if err := server.services.Unplug(context.Background(), c.P(0), c.P(1), c.P(2)); err == nil {
 		return JsonOk(c)
 	} else {
 		return JsonError(c, err)
 	}
 }
 
-func (server *APIServer) Update(c echo.Context) error {
+func (server *APIServer) UpdateService(c echo.Context) error {
 	if c.Form("endpoint") != "" {
 		var endpoint comm.ServiceEndpoint
 		if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
@@ -62,7 +62,7 @@ func (server *APIServer) Update(c echo.Context) error {
 		if endpoint.Type == "" || endpoint.Address == "" {
 			return JsonErrorf(c, comm.EcodeInvalidEndpoint, "")
 		}
-		if err := server.xbus.Update(context.Background(), c.P(0), c.P(1), c.P(2), &endpoint); err != nil {
+		if err := server.services.Update(context.Background(), c.P(0), c.P(1), c.P(2), &endpoint); err != nil {
 			return JsonError(c, err)
 		}
 	} else {
@@ -70,7 +70,7 @@ func (server *APIServer) Update(c echo.Context) error {
 		if !ok {
 			return err
 		}
-		if err := server.xbus.KeepAlive(context.Background(),
+		if err := server.services.KeepAlive(context.Background(),
 			c.P(0), c.P(1), c.P(2), clientv3.LeaseID(keepId)); err != nil {
 			return JsonError(c, err)
 		}
@@ -83,11 +83,11 @@ type QueryResult struct {
 	Revision  int64                  `json:"revision"`
 }
 
-func (server *APIServer) Query(c echo.Context) error {
+func (server *APIServer) QueryService(c echo.Context) error {
 	if c.Query("watch") == "true" {
-		return server.Watch(c)
+		return server.WatchService(c)
 	}
-	if endpoints, rev, err := server.xbus.Query(context.Background(),
+	if endpoints, rev, err := server.services.Query(context.Background(),
 		c.P(0), c.P(1)); err == nil {
 		return JsonResult(c, QueryResult{Endpoints: endpoints, Revision: rev})
 	} else {
@@ -95,7 +95,7 @@ func (server *APIServer) Query(c echo.Context) error {
 	}
 }
 
-func (server *APIServer) Watch(c echo.Context) error {
+func (server *APIServer) WatchService(c echo.Context) error {
 	revision, ok, err := IntQueryParam(c, "revision")
 	if !ok {
 		return err
@@ -111,7 +111,7 @@ func (server *APIServer) Watch(c echo.Context) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
 	defer cancelFunc()
 
-	if endpoints, rev, err := server.xbus.Watch(ctx,
+	if endpoints, rev, err := server.services.Watch(ctx,
 		c.P(0), c.P(1), revision); err == nil {
 		return JsonResult(c, QueryResult{Endpoints: endpoints, Revision: rev})
 	} else {

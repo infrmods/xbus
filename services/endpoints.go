@@ -1,4 +1,4 @@
-package service
+package services
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	"github.com/infrmods/xbus/comm"
 )
 
-func (xbus *XBus) makeEndpoints(kvs []*storagepb.KeyValue) ([]comm.ServiceEndpoint, error) {
+func (services *Services) makeEndpoints(kvs []*storagepb.KeyValue) ([]comm.ServiceEndpoint, error) {
 	endpoints := make([]comm.ServiceEndpoint, 0, len(kvs))
 	for _, kv := range kvs {
 		var endpoint comm.ServiceEndpoint

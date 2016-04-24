@@ -1,4 +1,4 @@
-package service
+package services
 
 import (
 	"fmt"
@@ -13,23 +13,23 @@ const (
 	MAX_NEW_UNIQUE_TRY = 5
 )
 
-func (xbus *XBus) etcdKeyPrefix(name, version string) string {
-	return fmt.Sprintf("%s/%s/%s", xbus.config.KeyPrefix, name, version)
+func (services *Services) etcdKeyPrefix(name, version string) string {
+	return fmt.Sprintf("%s/%s/%s", services.config.KeyPrefix, name, version)
 }
 
-func (xbus *XBus) etcdKey(name, version, id string) string {
-	return fmt.Sprintf("%s/%s/%s/%s", xbus.config.KeyPrefix, name, version, id)
+func (services *Services) etcdKey(name, version, id string) string {
+	return fmt.Sprintf("%s/%s/%s/%s", services.config.KeyPrefix, name, version, id)
 }
 
-func (xbus *XBus) newUniqueNode(ctx context.Context, ttl time.Duration,
+func (services *Services) newUniqueNode(ctx context.Context, ttl time.Duration,
 	prefix string, value string) (string, clientv3.LeaseID, error) {
 	for tried := 0; tried < MAX_NEW_UNIQUE_TRY; tried++ {
 		var leaseId clientv3.LeaseID
 		if ttl > 0 {
-			if rep, err := xbus.etcdClient.Lease.Create(ctx, int64(ttl.Seconds())); err == nil {
+			if rep, err := services.etcdClient.Lease.Create(ctx, int64(ttl.Seconds())); err == nil {
 				leaseId = clientv3.LeaseID(rep.ID)
 			} else {
-				return "", 0, cleanErr(err, "create lease fail", "create lease fail: %v", err)
+				return "", 0, comm.CleanErr(err, "create lease fail", "create lease fail: %v", err)
 			}
 		}
 
@@ -43,14 +43,14 @@ func (xbus *XBus) newUniqueNode(ctx context.Context, ttl time.Duration,
 			opPut = clientv3.OpPut(key, value)
 		}
 
-		if resp, err := xbus.etcdClient.Txn(ctx).If(cmp).Then(opPut).Commit(); err != nil {
-			return "", 0, cleanErr(err, "create unique key fail",
+		if resp, err := services.etcdClient.Txn(ctx).If(cmp).Then(opPut).Commit(); err != nil {
+			return "", 0, comm.CleanErr(err, "create unique key fail",
 				"Txn(create unique key(%s)) fail: %v", key, err)
 		} else if resp.Succeeded {
 			return id, leaseId, nil
 		} else if ttl > 0 {
-			if _, err := xbus.etcdClient.Revoke(context.Background(), leaseId); err != nil {
-				return "", 0, cleanErr(err, "retry create key fail",
+			if _, err := services.etcdClient.Revoke(context.Background(), leaseId); err != nil {
+				return "", 0, comm.CleanErr(err, "retry create key fail",
 					"revoke lease(%v) fail: %v", leaseId, err)
 			}
 		}
