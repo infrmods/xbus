@@ -15,6 +15,8 @@ const (
 	EcodeDamagedEndpointValue = "damaged-endpoint-value"
 	EcodeLoopExceeded         = "loop-exceeded"
 	EcodeNotFound             = "not-found"
+	EcodeDeadlineExceeded     = "deadline-exceeded"
+	EcodeCanceled             = "canceled"
 )
 
 type Error struct {

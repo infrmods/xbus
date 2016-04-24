@@ -84,7 +84,7 @@ type QueryResult struct {
 }
 
 func (server *APIServer) Query(c echo.Context) error {
-	if c.Param("watch") == "true" {
+	if c.Query("watch") == "true" {
 		return server.Watch(c)
 	}
 	if endpoints, rev, err := server.xbus.Query(context.Background(),
@@ -108,9 +108,11 @@ func (server *APIServer) Watch(c echo.Context) error {
 	} else {
 		timeout = DefaultWatchTimeout * time.Second
 	}
+	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
+	defer cancelFunc()
 
-	if endpoints, rev, err := server.xbus.Watch(context.Background(),
-		c.P(0), c.P(1), revision, timeout); err == nil {
+	if endpoints, rev, err := server.xbus.Watch(ctx,
+		c.P(0), c.P(1), revision); err == nil {
 		return JsonResult(c, QueryResult{Endpoints: endpoints, Revision: rev})
 	} else {
 		return JsonError(c, err)

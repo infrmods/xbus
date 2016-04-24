@@ -3,7 +3,6 @@ package service
 import (
 	"fmt"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/golang/glog"
 	"github.com/infrmods/xbus/comm"
 	"golang.org/x/net/context"
 	"strconv"
@@ -15,7 +14,7 @@ const (
 )
 
 func (xbus *XBus) etcdKeyPrefix(name, version string) string {
-	return fmt.Sprintf("%s/%s/%s/", xbus.config.KeyPrefix, name, version)
+	return fmt.Sprintf("%s/%s/%s", xbus.config.KeyPrefix, name, version)
 }
 
 func (xbus *XBus) etcdKey(name, version, id string) string {
@@ -27,11 +26,10 @@ func (xbus *XBus) newUniqueNode(ctx context.Context, ttl time.Duration,
 	for tried := 0; tried < MAX_NEW_UNIQUE_TRY; tried++ {
 		var leaseId clientv3.LeaseID
 		if ttl > 0 {
-			if rep, err := xbus.etcdClient.Lease.Grant(ctx, int64(ttl.Seconds())); err == nil {
+			if rep, err := xbus.etcdClient.Lease.Create(ctx, int64(ttl.Seconds())); err == nil {
 				leaseId = clientv3.LeaseID(rep.ID)
 			} else {
-				glog.Errorf("create lease fail: %v", err)
-				return "", 0, comm.NewError(comm.EcodeSystemError, "create lease fail")
+				return "", 0, cleanErr(err, "create lease fail", "create lease fail: %v", err)
 			}
 		}
 
@@ -46,14 +44,14 @@ func (xbus *XBus) newUniqueNode(ctx context.Context, ttl time.Duration,
 		}
 
 		if resp, err := xbus.etcdClient.Txn(ctx).If(cmp).Then(opPut).Commit(); err != nil {
-			glog.Errorf("Txn(create unique key(%s)) fail: %v", key, err)
-			return "", 0, comm.NewError(comm.EcodeSystemError, "create unique key fail")
+			return "", 0, cleanErr(err, "create unique key fail",
+				"Txn(create unique key(%s)) fail: %v", key, err)
 		} else if resp.Succeeded {
 			return id, leaseId, nil
 		} else if ttl > 0 {
 			if _, err := xbus.etcdClient.Revoke(context.Background(), leaseId); err != nil {
-				glog.Errorf("revoke lease(%v) fail: %v", leaseId, err)
-				return "", 0, comm.NewError(comm.EcodeSystemError, "revoke lease fail")
+				return "", 0, cleanErr(err, "retry create key fail",
+					"revoke lease(%v) fail: %v", leaseId, err)
 			}
 		}
 	}

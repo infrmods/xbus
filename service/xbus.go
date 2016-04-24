@@ -7,8 +7,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/comm"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"regexp"
 	"strings"
 	"time"
@@ -137,11 +135,7 @@ func (xbus *XBus) KeepAlive(ctx context.Context, name, version, id string, keepI
 		return err
 	}
 	if _, err := xbus.etcdClient.Lease.KeepAliveOnce(ctx, keepId); err != nil {
-		if grpc.Code(err) == codes.NotFound {
-			return comm.NewError(comm.EcodeNotFound, "")
-		}
-		glog.Errorf("KeepAliveOnce(%d) fail: %v", keepId, err)
-		return comm.NewError(comm.EcodeSystemError, "")
+		return cleanErr(err, "keepalive fail", "KeepAliveOnce(%d) fail: %v", keepId, err)
 	}
 	return nil
 }
@@ -155,35 +149,29 @@ func (xbus *XBus) Query(ctx context.Context, name, version string) ([]comm.Servi
 }
 
 func (xbus *XBus) query(ctx context.Context, key string) ([]comm.ServiceEndpoint, int64, error) {
-	if resp, err := xbus.etcdClient.Get(ctx, key); err == nil {
+	if resp, err := xbus.etcdClient.Get(ctx, key, clientv3.WithFromKey()); err == nil {
 		if endpoints, err := xbus.makeEndpoints(resp.Kvs); err == nil {
 			return endpoints, resp.Header.Revision, nil
 		} else {
 			return nil, 0, err
 		}
 	} else {
-		if grpc.Code(err) == codes.NotFound {
-			return nil, 0, comm.NewError(comm.EcodeNotFound, "")
-		}
-		glog.Errorf("Query(%s) fail: %v", key, err)
-		return nil, 0, comm.NewError(comm.EcodeSystemError, "")
+		return nil, 0, cleanErr(err, "query fail", "Query(%s) fail: %v", key, err)
 	}
 }
 
 func (xbus *XBus) Watch(ctx context.Context, name, version string,
-	revision int64, timeout time.Duration) ([]comm.ServiceEndpoint, int64, error) {
+	revision int64) ([]comm.ServiceEndpoint, int64, error) {
 	if err := checkNameVersion(name, version); err != nil {
 		return nil, 0, err
 	}
 	key := xbus.etcdKeyPrefix(name, version)
 	watcher := clientv3.NewWatcher(xbus.etcdClient)
 	defer watcher.Close()
-	tCtx, cancelFunc := context.WithTimeout(ctx, timeout)
-	defer cancelFunc()
-	watchCh := watcher.Watch(tCtx, key, clientv3.WithRev(revision))
+	watchCh := watcher.Watch(ctx, key, clientv3.WithRev(revision), clientv3.WithPrefix())
 	resp := <-watchCh
 	if !resp.Canceled {
-		return xbus.query(tCtx, key)
+		return xbus.query(ctx, key)
 	}
 	return nil, 0, nil
 }
