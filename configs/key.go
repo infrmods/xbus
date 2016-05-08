@@ -6,7 +6,7 @@ import (
 	"regexp"
 )
 
-var rValidName = regexp.MustCompile(`(?i)[a-z][a-z0-9_.-]{5,}`)
+var rValidName = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]{5,}$`)
 
 func checkName(name string) error {
 	if !rValidName.MatchString(name) {
@@ -15,7 +15,7 @@ func checkName(name string) error {
 	return nil
 }
 
-var rValidNamePrefix = regexp.MustCompile(`(?i)[a-z][a-z0-9_.-]?`)
+var rValidNamePrefix = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]?$`)
 
 func checkNamePrefix(name string) error {
 	if name != "" {

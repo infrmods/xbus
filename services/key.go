@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-var rValidName = regexp.MustCompile(`(?i)[a-z][a-z0-9_.-]{5,}`)
-var rValidVersion = regexp.MustCompile(`(?i)[a-z0-9][a-z0-9_.-]*`)
+var rValidName = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]{5,}$`)
+var rValidVersion = regexp.MustCompile(`(?i)^[a-z0-9][a-z0-9_.-]*$`)
 
 func checkNameVersion(name, version string) error {
 	if !rValidName.MatchString(name) {
@@ -24,7 +24,7 @@ func checkNameVersion(name, version string) error {
 	return nil
 }
 
-var rValidServiceId = regexp.MustCompile(`(?i)[a-f0-9]+`)
+var rValidServiceId = regexp.MustCompile(`(?i)^[a-f0-9]+$`)
 
 func checkServiceId(id string) error {
 	if !rValidServiceId.MatchString(id) {
