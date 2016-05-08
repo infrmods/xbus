@@ -17,6 +17,7 @@ const (
 	EcodeNotFound             = "not-found"
 	EcodeDeadlineExceeded     = "deadline-exceeded"
 	EcodeCanceled             = "canceled"
+	EcodeDeleted              = "deleted"
 )
 
 type Error struct {

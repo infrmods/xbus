@@ -47,7 +47,8 @@ func main() {
 	}
 
 	services := services.NewServices(&cfg.Services, etcdClient)
-	apiServer := api.NewAPIServer(&cfg.Api, services)
+	configs := configs.NewConfigs(&cfg.Configs, etcdClient)
+	apiServer := api.NewAPIServer(&cfg.Api, services, configs)
 	if err := apiServer.Start(); err != nil {
 		glog.Errorf("start api_sersver fail: %v", err)
 		return

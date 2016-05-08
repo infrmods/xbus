@@ -5,7 +5,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/comm"
 	"golang.org/x/net/context"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -27,28 +26,6 @@ func NewServices(config *Config, etcdClient *clientv3.Client) *Services {
 	return services
 }
 
-var rValidName = regexp.MustCompile(`(?i)[a-z][a-z0-9_.]{5,}`)
-var rValidVersion = regexp.MustCompile(`(?i)[a-z0-9][a-z0-9_.]*`)
-
-func checkNameVersion(name, version string) error {
-	if !rValidName.MatchString(name) {
-		return comm.NewError(comm.EcodeInvalidName, "")
-	}
-	if !rValidVersion.MatchString(version) {
-		return comm.NewError(comm.EcodeInvalidVersion, "")
-	}
-	return nil
-}
-
-var rValidServiceId = regexp.MustCompile(`(?i)[a-f0-9]+`)
-
-func checkServiceId(id string) error {
-	if !rValidServiceId.MatchString(id) {
-		return comm.NewError(comm.EcodeInvalidServiceId, "")
-	}
-	return nil
-}
-
 func (services *Services) Plug(ctx context.Context, name, version string,
 	ttl time.Duration, endpoint *comm.ServiceEndpoint) (string, clientv3.LeaseID, error) {
 	if err := checkNameVersion(name, version); err != nil {
@@ -64,7 +41,7 @@ func (services *Services) Plug(ctx context.Context, name, version string,
 	if err != nil {
 		return "", 0, err
 	}
-	return services.newUniqueNode(ctx, ttl, services.etcdKeyPrefix(name, version), string(data))
+	return services.newUniqueNode(ctx, ttl, services.serviceKeyPrefix(name, version), string(data))
 }
 
 func (services *Services) Unplug(ctx context.Context, name, version, id string) error {
@@ -74,8 +51,8 @@ func (services *Services) Unplug(ctx context.Context, name, version, id string) 
 	if err := checkServiceId(id); err != nil {
 		return err
 	}
-	if _, err := services.etcdClient.Delete(ctx, services.etcdKey(name, version, id)); err != nil {
-		glog.Errorf("delete key(%s) fail: %v", services.etcdKey(name, version, id), err)
+	if _, err := services.etcdClient.Delete(ctx, services.serviceKey(name, version, id)); err != nil {
+		glog.Errorf("delete key(%s) fail: %v", services.serviceKey(name, version, id), err)
 		return comm.NewError(comm.EcodeSystemError, "delete key fail")
 	}
 	return nil
@@ -88,7 +65,7 @@ func (services *Services) Update(ctx context.Context, name, version, id string, 
 	if err := checkServiceId(id); err != nil {
 		return err
 	}
-	key := services.etcdKey(name, version, id)
+	key := services.serviceKey(name, version, id)
 	data, err := endpoint.Marshal()
 	if err != nil {
 		return err
@@ -126,7 +103,7 @@ func (services *Services) Query(ctx context.Context, name, version string) ([]co
 	if err := checkNameVersion(name, version); err != nil {
 		return nil, 0, err
 	}
-	key := services.etcdKeyPrefix(name, version)
+	key := services.serviceKeyPrefix(name, version)
 	return services.query(ctx, key)
 }
 
@@ -147,7 +124,7 @@ func (services *Services) Watch(ctx context.Context, name, version string,
 	if err := checkNameVersion(name, version); err != nil {
 		return nil, 0, err
 	}
-	key := services.etcdKeyPrefix(name, version)
+	key := services.serviceKeyPrefix(name, version)
 	watcher := clientv3.NewWatcher(services.etcdClient)
 	defer watcher.Close()
 	watchCh := watcher.Watch(ctx, key, clientv3.WithRev(revision), clientv3.WithPrefix())

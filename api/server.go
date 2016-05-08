@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/facebookgo/httpdown"
 	"github.com/golang/glog"
+	"github.com/infrmods/xbus/configs"
 	"github.com/infrmods/xbus/services"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/engine/standard"
@@ -19,18 +20,20 @@ type Config struct {
 type APIServer struct {
 	config   Config
 	services *services.Services
+	configs  *configs.Configs
 	httpdown.Server
 }
 
-func NewAPIServer(config *Config, xbus *services.Services) *APIServer {
-	server := &APIServer{config: *config, services: xbus}
+func NewAPIServer(config *Config, servs *services.Services, cfgs *configs.Configs) *APIServer {
+	server := &APIServer{config: *config, services: servs, configs: cfgs}
 	return server
 }
 
 func (server *APIServer) Start() error {
 	e := echo.New()
 	e.Use(middleware.Recover())
-	server.registerServiceAPIs(e.Group("/services"))
+	server.registerServiceAPIs(e.Group("/api/services"))
+	server.registerConfigAPIs(e.Group("/api/configs"))
 	std := standard.New(server.config.Listen)
 	std.SetHandler(e)
 
@@ -51,4 +54,10 @@ func (server *APIServer) registerServiceAPIs(g *echo.Group) {
 	g.Delete("/:name/:version/:id", echo.HandlerFunc(server.UnplugService))
 	g.Put("/:name/:version/:id", echo.HandlerFunc(server.UpdateService))
 	g.Get("/:name/:version", echo.HandlerFunc(server.QueryService))
+}
+
+func (server *APIServer) registerConfigAPIs(g *echo.Group) {
+	g.Get("", echo.HandlerFunc(server.RangeConfigs))
+	g.Get("/:name", echo.HandlerFunc(server.GetConfig))
+	g.Put("/:name", echo.HandlerFunc(server.PutConfig))
 }

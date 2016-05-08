@@ -27,7 +27,6 @@ func CleanErr(err error, sysErrRet, sysErrformat string, args ...interface{}) er
 		return NewError(EcodeCanceled, "")
 	}
 
-	glog.Infof("err: %#v, de: %#v", err, context.DeadlineExceeded)
 	glog.Errorf(sysErrformat, args...)
 	return NewError(EcodeSystemError, sysErrRet)
 }
