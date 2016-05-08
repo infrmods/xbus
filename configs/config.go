@@ -29,6 +29,12 @@ func NewConfigs(config *Config, etcdClient *clientv3.Client) *Configs {
 const RANGE_LIMIT = 20
 
 func (configs *Configs) Range(ctx context.Context, from, end string, sortOption *clientv3.SortOption) ([]comm.Config, bool, error) {
+	if err := checkNamePrefix(from); err != nil {
+		return nil, false, err
+	}
+	if err := checkNamePrefix(end); err != nil {
+		return nil, false, err
+	}
 	fromKey := configs.configKey(from)
 	endKey := configs.configKey(end)
 	if end == "" {
