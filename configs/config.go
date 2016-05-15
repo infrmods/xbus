@@ -2,7 +2,7 @@ package configs
 
 import (
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/storage/storagepb"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/comm"
 	"golang.org/x/net/context"
@@ -77,7 +77,7 @@ func (configs *Configs) Get(ctx context.Context, name string) (*comm.Config, int
 	}
 }
 
-func configFromKv(name string, kv *storagepb.KeyValue) comm.Config {
+func configFromKv(name string, kv *mvccpb.KeyValue) comm.Config {
 	return comm.Config{Name: name,
 		Value:   string(kv.Value),
 		Version: kv.Version}
@@ -97,7 +97,7 @@ func (configs *Configs) Put(ctx context.Context, name, value string, version int
 	} else {
 		cmp := clientv3.Compare(clientv3.Version(key), "=", version)
 		opPut := clientv3.OpPut(key, value)
-		if resp, err := configs.etcdClient.Txn(ctx).If(cmp).Then(opPut).Commit(); err == nil {
+		if resp, err := configs.etcdClient.Txn(ctx).If(cmp).Then(opPut).Commit(); err != nil {
 			return 0, comm.CleanErr(err, "", "put config key(%s) with version(%d) fail: %v", name, version, err)
 		} else if !resp.Succeeded {
 			return 0, comm.NewError(comm.EcodeInvalidVersion, "")
@@ -130,10 +130,10 @@ func (configs *Configs) Watch(ctx context.Context, name string, revision int64) 
 	}
 	for _, event := range resp.Events {
 		switch event.Type {
-		case storagepb.PUT:
+		case mvccpb.PUT:
 			cfg := configFromKv(name, event.Kv)
 			return &cfg, resp.Header.Revision, nil
-		case storagepb.EXPIRE, storagepb.DELETE:
+		case mvccpb.EXPIRE, mvccpb.DELETE:
 			return nil, 0, comm.NewError(comm.EcodeDeleted, "")
 		}
 	}

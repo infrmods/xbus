@@ -108,7 +108,7 @@ func (services *Services) Query(ctx context.Context, name, version string) ([]co
 }
 
 func (services *Services) query(ctx context.Context, key string) ([]comm.ServiceEndpoint, int64, error) {
-	if resp, err := services.etcdClient.Get(ctx, key, clientv3.WithFromKey()); err == nil {
+	if resp, err := services.etcdClient.Get(ctx, key, clientv3.WithPrefix()); err == nil {
 		if endpoints, err := services.makeEndpoints(resp.Kvs); err == nil {
 			return endpoints, resp.Header.Revision, nil
 		} else {

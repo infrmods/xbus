@@ -46,7 +46,7 @@ const MAX_NEW_UNIQUE_TRY = 5
 func (services *Services) newUniqueNode(ctx context.Context, ttl time.Duration,
 	prefix string, value string) (node string, leaseId clientv3.LeaseID, rerr error) {
 	if ttl > 0 {
-		if resp, err := services.etcdClient.Lease.Create(ctx, int64(ttl.Seconds())); err == nil {
+		if resp, err := services.etcdClient.Lease.Grant(ctx, int64(ttl.Seconds())); err == nil {
 			leaseId = clientv3.LeaseID(resp.ID)
 			defer func() {
 				if rerr != nil {
@@ -62,7 +62,7 @@ func (services *Services) newUniqueNode(ctx context.Context, ttl time.Duration,
 	}
 
 	for tried := 0; tried < MAX_NEW_UNIQUE_TRY; tried++ {
-		id := strconv.FormatInt(time.Now().UnixNano(), 16)
+		id := strconv.FormatInt(time.Now().UnixNano(), 36)
 		key := fmt.Sprintf("%s/%s", prefix, id)
 		cmp := clientv3.Compare(clientv3.Version(key), "=", 0)
 		var opPut clientv3.Op

@@ -1,7 +1,6 @@
 package api
 
 import (
-	//"github.com/infrmods/xbus/service"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/infrmods/xbus/comm"
 	"github.com/labstack/echo"

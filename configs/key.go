@@ -31,5 +31,5 @@ func (configs *Configs) configKey(name string) string {
 }
 
 func (configs *Configs) endKey() string {
-	return configs.config.KeyPrefix + "0"
+	return comm.RangeEndKey(configs.config.KeyPrefix)
 }
