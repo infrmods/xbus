@@ -28,22 +28,30 @@ func NewServices(config *Config, etcdClient *clientv3.Client) *Services {
 }
 
 func (services *Services) Plug(ctx context.Context, name, version string,
-	ttl time.Duration, endpoint *comm.ServiceEndpoint) (clientv3.LeaseID, error) {
+	ttl time.Duration, desc *comm.ServiceDesc, endpoint *comm.ServiceEndpoint) (clientv3.LeaseID, error) {
 	if err := checkNameVersion(name, version); err != nil {
 		return 0, err
 	}
-	if endpoint.Type == "" {
+	if desc.Type == "" {
 		return 0, comm.NewError(comm.EcodeInvalidEndpoint, "missing type")
 	}
 	if endpoint.Address == "" {
 		return 0, comm.NewError(comm.EcodeInvalidEndpoint, "missing address")
 	}
-	data, err := endpoint.Marshal()
+	if err := checkAddress(endpoint.Address); err != nil {
+		return 0, err
+	}
+
+	desc_data, err := desc.Marshal()
+	endpoint_data, err := endpoint.Marshal()
 	if err != nil {
 		return 0, err
 	}
+	if err := services.ensureServiceDesc(ctx, name, version, string(desc_data)); err != nil {
+		return 0, err
+	}
 	return services.newServiceNode(ctx, ttl,
-		services.serviceKey(name, version, endpoint.Address), string(data))
+		services.serviceKey(name, version, endpoint.Address), string(endpoint_data))
 }
 
 func (services *Services) Unplug(ctx context.Context, name, version, addr string) error {

@@ -13,11 +13,12 @@ const (
 	EcodeInvalidAddress       = "invalid-address"
 	EcodeInvalidEndpoint      = "invalid-endpoint"
 	EcodeDamagedEndpointValue = "damaged-endpoint-value"
-	EcodeLoopExceeded         = "loop-exceeded"
+	EcodeTooManyAttempts      = "too-many-attempts"
 	EcodeNotFound             = "not-found"
 	EcodeDeadlineExceeded     = "deadline-exceeded"
 	EcodeCanceled             = "canceled"
 	EcodeDeleted              = "deleted"
+	EcodeChangedServiceDesc   = "changed-service-desc"
 )
 
 type Error struct {

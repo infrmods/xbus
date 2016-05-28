@@ -26,16 +26,17 @@ func (server *APIServer) PulgService(c echo.Context) error {
 	if ttl > 0 && ttl < MinServiceTTL {
 		return JsonErrorf(c, comm.EcodeInvalidParam, "invalid ttl: %d", ttl)
 	}
+	var desc comm.ServiceDesc
+	if ok, err := JsonFormParam(c, "desc", &desc); !ok {
+		return err
+	}
 	var endpoint comm.ServiceEndpoint
 	if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
 		return err
 	}
-	if endpoint.Type == "" || endpoint.Address == "" {
-		return JsonErrorf(c, comm.EcodeInvalidEndpoint, "")
-	}
 
 	if kid, err := server.services.Plug(context.Background(),
-		c.P(0), c.P(1), time.Duration(ttl)*time.Second, &endpoint); err == nil {
+		c.P(0), c.P(1), time.Duration(ttl)*time.Second, &desc, &endpoint); err == nil {
 		return JsonResult(c, PlugResult{KeepId: int64(kid)})
 	} else {
 		return JsonError(c, err)
@@ -56,9 +57,6 @@ func (server *APIServer) UpdateService(c echo.Context) error {
 		var endpoint comm.ServiceEndpoint
 		if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
 			return err
-		}
-		if endpoint.Type == "" || endpoint.Address == "" {
-			return JsonErrorf(c, comm.EcodeInvalidEndpoint, "")
 		}
 		if err := server.services.Update(context.Background(), c.P(0), c.P(1), c.P(2), &endpoint); err != nil {
 			return JsonError(c, err)

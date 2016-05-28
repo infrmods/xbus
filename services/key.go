@@ -36,11 +36,53 @@ func (services *Services) serviceKeyPrefix(name, version string) string {
 	return fmt.Sprintf("%s/%s/%s", services.config.KeyPrefix, name, version)
 }
 
-func (services *Services) serviceKey(name, version, addr string) string {
-	return fmt.Sprintf("%s/%s/%s/%s", services.config.KeyPrefix, name, version, addr)
+func (services *Services) serviceDescKey(name, version string) string {
+	return fmt.Sprintf("%s/%s/%s/desc", services.config.KeyPrefix, name, version)
 }
 
-const MAX_NEW_UNIQUE_TRY = 5
+func (services *Services) serviceKey(name, version, addr string) string {
+	return fmt.Sprintf("%s/%s/%s/node_%s", services.config.KeyPrefix, name, version, addr)
+}
+
+const MAX_NEW_UNIQUE_TRY = 3
+
+func (services *Services) ensureServiceDesc(ctx context.Context, name, version, value string) error {
+	key := services.serviceDescKey(name, version)
+	for i := 0; i < MAX_NEW_UNIQUE_TRY; i++ {
+		txn := services.etcdClient.Txn(ctx).If(
+			clientv3.Compare(clientv3.Value(key), "=", value),
+		).Then().Else(clientv3.OpGet(key))
+
+		if resp, err := txn.Commit(); err == nil {
+			if resp.Succeeded {
+				return nil
+			}
+			if len(resp.Responses) == 1 {
+				if rangeResp := resp.Responses[0].GetResponseRange(); rangeResp != nil {
+					if len(rangeResp.Kvs) == 0 {
+						txn := services.etcdClient.Txn(ctx).If(
+							clientv3.Compare(clientv3.Version(key), "=", 0),
+						).Then(clientv3.OpPut(key, value))
+						if resp, err := txn.Commit(); err == nil {
+							if resp.Succeeded {
+								return nil
+							}
+							continue
+						} else {
+							return comm.CleanErr(err, "put service-desc fail", "put service-desc fail: %v", err)
+						}
+					}
+					return comm.NewError(comm.EcodeChangedServiceDesc, "service-desc can't be change")
+				}
+			}
+			glog.Errorf("ensureServiceDesc fail, get invalid response: %v", resp)
+			return comm.NewError(comm.EcodeSystemError, "unexpected old service-desc")
+		} else {
+			return comm.CleanErr(err, "put service-desc fail", "exec service-desc check txn fail: %v", err)
+		}
+	}
+	return comm.NewError(comm.EcodeTooManyAttempts, "put service-desc fail: too many attempts")
+}
 
 func (services *Services) newServiceNode(ctx context.Context, ttl time.Duration,
 	key, value string) (leaseId clientv3.LeaseID, rerr error) {
