@@ -10,7 +10,7 @@ const (
 	EcodeMissingParam         = "missing-param"
 	EcodeInvalidName          = "invalid-name"
 	EcodeInvalidVersion       = "invalid-version"
-	EcodeInvalidServiceId     = "invalid-service-id"
+	EcodeInvalidAddress       = "invalid-address"
 	EcodeInvalidEndpoint      = "invalid-endpoint"
 	EcodeDamagedEndpointValue = "damaged-endpoint-value"
 	EcodeLoopExceeded         = "loop-exceeded"

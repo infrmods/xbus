@@ -15,8 +15,7 @@ const (
 )
 
 type PlugResult struct {
-	ServiceId string `json:"service_id"`
-	KeepId    int64  `json:"keep_id"`
+	KeepId int64 `json:"keep_id"`
 }
 
 func (server *APIServer) PulgService(c echo.Context) error {
@@ -35,9 +34,9 @@ func (server *APIServer) PulgService(c echo.Context) error {
 		return JsonErrorf(c, comm.EcodeInvalidEndpoint, "")
 	}
 
-	if sid, kid, err := server.services.Plug(context.Background(),
+	if kid, err := server.services.Plug(context.Background(),
 		c.P(0), c.P(1), time.Duration(ttl)*time.Second, &endpoint); err == nil {
-		return JsonResult(c, PlugResult{ServiceId: sid, KeepId: int64(kid)})
+		return JsonResult(c, PlugResult{KeepId: int64(kid)})
 	} else {
 		return JsonError(c, err)
 	}

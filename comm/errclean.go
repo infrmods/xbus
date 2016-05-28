@@ -1,32 +1,48 @@
 package comm
 
 import (
+	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
 
-func CleanErr(err error, sysErrRet, sysErrformat string, args ...interface{}) error {
-	grpcCode := grpc.Code(err)
-	if grpcCode != codes.Unknown {
-		switch grpcCode {
+func GetErrCode(err error) codes.Code {
+	var code codes.Code = codes.Unknown
+	if etcdErr, ok := err.(rpctypes.EtcdError); ok {
+		code = etcdErr.Code()
+	} else {
+		code = grpc.Code(err)
+	}
+	return code
+}
+
+func CleanErrWithCode(err error, sysErrRet, sysErrformat string, args ...interface{}) (codes.Code, error) {
+	code := GetErrCode(err)
+	if code != codes.Unknown {
+		switch code {
 		case codes.NotFound:
-			return NewError(EcodeNotFound, "")
+			return code, NewError(EcodeNotFound, "")
 		case codes.DeadlineExceeded:
-			return NewError(EcodeDeadlineExceeded, "")
+			return code, NewError(EcodeDeadlineExceeded, "")
 		case codes.Canceled:
-			return NewError(EcodeCanceled, "")
+			return code, NewError(EcodeCanceled, "")
 		}
 	}
 
 	switch err {
 	case context.DeadlineExceeded:
-		return NewError(EcodeDeadlineExceeded, "")
+		return code, NewError(EcodeDeadlineExceeded, "")
 	case context.Canceled:
-		return NewError(EcodeCanceled, "")
+		return code, NewError(EcodeCanceled, "")
 	}
 
 	glog.Errorf(sysErrformat, args...)
-	return NewError(EcodeSystemError, sysErrRet)
+	return code, NewError(EcodeSystemError, sysErrRet)
+}
+
+func CleanErr(err error, sysErrRet, sysErrformat string, args ...interface{}) error {
+	_, newErr := CleanErrWithCode(err, sysErrRet, sysErrformat, args...)
+	return newErr
 }

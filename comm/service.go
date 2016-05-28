@@ -6,10 +6,10 @@ import (
 )
 
 type ServiceEndpoint struct {
-	Type    string
-	Address string
-	Config  string `json:",omitempty"`
-	Proto   string `json:",omitempty"`
+	Type    string `json:"type"`
+	Address string `json:"address"`
+	Config  string `json:"config,omitempty"`
+	Proto   string `json:"proto,omitempty"`
 }
 
 func (endpoint *ServiceEndpoint) Marshal() ([]byte, error) {

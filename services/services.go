@@ -5,6 +5,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/comm"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc/codes"
 	"strings"
 	"time"
 )
@@ -27,45 +28,46 @@ func NewServices(config *Config, etcdClient *clientv3.Client) *Services {
 }
 
 func (services *Services) Plug(ctx context.Context, name, version string,
-	ttl time.Duration, endpoint *comm.ServiceEndpoint) (string, clientv3.LeaseID, error) {
+	ttl time.Duration, endpoint *comm.ServiceEndpoint) (clientv3.LeaseID, error) {
 	if err := checkNameVersion(name, version); err != nil {
-		return "", 0, err
+		return 0, err
 	}
 	if endpoint.Type == "" {
-		return "", 0, comm.NewError(comm.EcodeInvalidEndpoint, "missing type")
+		return 0, comm.NewError(comm.EcodeInvalidEndpoint, "missing type")
 	}
 	if endpoint.Address == "" {
-		return "", 0, comm.NewError(comm.EcodeInvalidEndpoint, "missing address")
+		return 0, comm.NewError(comm.EcodeInvalidEndpoint, "missing address")
 	}
 	data, err := endpoint.Marshal()
 	if err != nil {
-		return "", 0, err
+		return 0, err
 	}
-	return services.newUniqueNode(ctx, ttl, services.serviceKeyPrefix(name, version), string(data))
+	return services.newServiceNode(ctx, ttl,
+		services.serviceKey(name, version, endpoint.Address), string(data))
 }
 
-func (services *Services) Unplug(ctx context.Context, name, version, id string) error {
+func (services *Services) Unplug(ctx context.Context, name, version, addr string) error {
 	if err := checkNameVersion(name, version); err != nil {
 		return err
 	}
-	if err := checkServiceId(id); err != nil {
+	if err := checkAddress(addr); err != nil {
 		return err
 	}
-	if _, err := services.etcdClient.Delete(ctx, services.serviceKey(name, version, id)); err != nil {
-		glog.Errorf("delete key(%s) fail: %v", services.serviceKey(name, version, id), err)
+	if _, err := services.etcdClient.Delete(ctx, services.serviceKey(name, version, addr)); err != nil {
+		glog.Errorf("delete key(%s) fail: %v", services.serviceKey(name, version, addr), err)
 		return comm.NewError(comm.EcodeSystemError, "delete key fail")
 	}
 	return nil
 }
 
-func (services *Services) Update(ctx context.Context, name, version, id string, endpoint *comm.ServiceEndpoint) error {
+func (services *Services) Update(ctx context.Context, name, version, addr string, endpoint *comm.ServiceEndpoint) error {
 	if err := checkNameVersion(name, version); err != nil {
 		return err
 	}
-	if err := checkServiceId(id); err != nil {
+	if err := checkAddress(addr); err != nil {
 		return err
 	}
-	key := services.serviceKey(name, version, id)
+	key := services.serviceKey(name, version, addr)
 	data, err := endpoint.Marshal()
 	if err != nil {
 		return err
@@ -86,15 +88,19 @@ func (services *Services) Update(ctx context.Context, name, version, id string, 
 	}
 }
 
-func (services *Services) KeepAlive(ctx context.Context, name, version, id string, keepId clientv3.LeaseID) error {
+func (services *Services) KeepAlive(ctx context.Context, name, version, addr string, keepId clientv3.LeaseID) error {
 	if err := checkNameVersion(name, version); err != nil {
 		return err
 	}
-	if err := checkServiceId(id); err != nil {
+	if err := checkAddress(addr); err != nil {
 		return err
 	}
 	if _, err := services.etcdClient.Lease.KeepAliveOnce(ctx, keepId); err != nil {
-		return comm.CleanErr(err, "keepalive fail", "KeepAliveOnce(%d) fail: %v", keepId, err)
+		code, err := comm.CleanErrWithCode(err, "keepalive fail", "KeepAliveOnce(%d) fail: %#v", keepId, err)
+		if code == codes.NotFound {
+			return comm.NewError(comm.EcodeNotFound, "keepId not found")
+		}
+		return err
 	}
 	return nil
 }

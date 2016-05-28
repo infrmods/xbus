@@ -7,7 +7,6 @@ import (
 	"github.com/infrmods/xbus/comm"
 	"golang.org/x/net/context"
 	"regexp"
-	"strconv"
 	"time"
 )
 
@@ -24,11 +23,11 @@ func checkNameVersion(name, version string) error {
 	return nil
 }
 
-var rValidServiceId = regexp.MustCompile(`(?i)^[a-f0-9]+$`)
+var rValidAddress = regexp.MustCompile(`(?i)^[a-z0-9:_-]+$`)
 
-func checkServiceId(id string) error {
-	if !rValidServiceId.MatchString(id) {
-		return comm.NewError(comm.EcodeInvalidServiceId, "")
+func checkAddress(addr string) error {
+	if !rValidAddress.MatchString(addr) {
+		return comm.NewError(comm.EcodeInvalidAddress, "")
 	}
 	return nil
 }
@@ -37,14 +36,14 @@ func (services *Services) serviceKeyPrefix(name, version string) string {
 	return fmt.Sprintf("%s/%s/%s", services.config.KeyPrefix, name, version)
 }
 
-func (services *Services) serviceKey(name, version, id string) string {
-	return fmt.Sprintf("%s/%s/%s/%s", services.config.KeyPrefix, name, version, id)
+func (services *Services) serviceKey(name, version, addr string) string {
+	return fmt.Sprintf("%s/%s/%s/%s", services.config.KeyPrefix, name, version, addr)
 }
 
 const MAX_NEW_UNIQUE_TRY = 5
 
-func (services *Services) newUniqueNode(ctx context.Context, ttl time.Duration,
-	prefix string, value string) (node string, leaseId clientv3.LeaseID, rerr error) {
+func (services *Services) newServiceNode(ctx context.Context, ttl time.Duration,
+	key, value string) (leaseId clientv3.LeaseID, rerr error) {
 	if ttl > 0 {
 		if resp, err := services.etcdClient.Lease.Grant(ctx, int64(ttl.Seconds())); err == nil {
 			leaseId = clientv3.LeaseID(resp.ID)
@@ -57,28 +56,20 @@ func (services *Services) newUniqueNode(ctx context.Context, ttl time.Duration,
 				}
 			}()
 		} else {
-			return "", 0, comm.CleanErr(err, "create lease fail", "create lease fail: %v", err)
+			return 0, comm.CleanErr(err, "create lease fail", "create lease fail: %v", err)
 		}
 	}
 
-	for tried := 0; tried < MAX_NEW_UNIQUE_TRY; tried++ {
-		id := strconv.FormatInt(time.Now().UnixNano(), 36)
-		key := fmt.Sprintf("%s/%s", prefix, id)
-		cmp := clientv3.Compare(clientv3.Version(key), "=", 0)
-		var opPut clientv3.Op
-		if ttl > 0 {
-			opPut = clientv3.OpPut(key, value, clientv3.WithLease(leaseId))
-		} else {
-			opPut = clientv3.OpPut(key, value)
-		}
-
-		if resp, err := services.etcdClient.Txn(ctx).If(cmp).Then(opPut).Commit(); err != nil {
-			return "", 0, comm.CleanErr(err, "create unique key fail",
-				"Txn(create unique key(%s)) fail: %v", key, err)
-		} else if resp.Succeeded {
-			return id, leaseId, nil
-		}
+	var err error
+	if ttl > 0 {
+		_, err = services.etcdClient.Put(ctx, key, value, clientv3.WithLease(leaseId))
+	} else {
+		_, err = services.etcdClient.Put(ctx, key, value)
 	}
 
-	return "", 0, comm.NewError(comm.EcodeLoopExceeded, "tried too many times(newUniqueEphemeralNode)")
+	if err != nil {
+		return 0, comm.CleanErr(err, "create unique key fail",
+			"Txn(create unique key(%s)) fail: %v", key, err)
+	}
+	return leaseId, nil
 }
