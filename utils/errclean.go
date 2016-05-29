@@ -1,4 +1,4 @@
-package comm
+package utils
 
 import (
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"

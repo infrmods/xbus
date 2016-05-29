@@ -2,7 +2,7 @@ package configs
 
 import (
 	"fmt"
-	"github.com/infrmods/xbus/comm"
+	"github.com/infrmods/xbus/utils"
 	"regexp"
 )
 
@@ -10,7 +10,7 @@ var rValidName = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]{5,}$`)
 
 func checkName(name string) error {
 	if !rValidName.MatchString(name) {
-		return comm.NewError(comm.EcodeInvalidName, "")
+		return utils.NewError(utils.EcodeInvalidName, "")
 	}
 	return nil
 }
@@ -20,7 +20,7 @@ var rValidNamePrefix = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]?$`)
 func checkNamePrefix(name string) error {
 	if name != "" {
 		if !rValidNamePrefix.MatchString(name) {
-			return comm.NewError(comm.EcodeInvalidName, "")
+			return utils.NewError(utils.EcodeInvalidName, "")
 		}
 	}
 	return nil
@@ -31,5 +31,5 @@ func (ctrl *ConfigCtrl) configKey(name string) string {
 }
 
 func (ctrl *ConfigCtrl) endKey() string {
-	return comm.RangeEndKey(ctrl.config.KeyPrefix)
+	return utils.RangeEndKey(ctrl.config.KeyPrefix)
 }

@@ -6,14 +6,14 @@ import (
 	"github.com/gocomm/config"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/api"
-	"github.com/infrmods/xbus/comm"
+	"github.com/infrmods/xbus/utils"
 	"github.com/infrmods/xbus/configs"
 	"github.com/infrmods/xbus/services"
 	"gopkg.in/yaml.v2"
 )
 
 type Config struct {
-	Etcd     comm.ETCDConfig
+	Etcd     utils.ETCDConfig
 	Services services.Config
 	Configs  configs.Config
 	Api      api.Config

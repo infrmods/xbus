@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/coreos/etcd/clientv3"
-	"github.com/infrmods/xbus/comm"
+	"github.com/infrmods/xbus/utils"
 	"github.com/infrmods/xbus/configs"
 	"github.com/labstack/echo"
 	"golang.org/x/net/context"
@@ -24,7 +24,7 @@ func (server *APIServer) RangeConfigs(c echo.Context) error {
 	case "desc":
 		sortOption.Order = clientv3.SortDescend
 	default:
-		return JsonErrorf(c, comm.EcodeInvalidParam, "invalid order")
+		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid order")
 	}
 
 	if cfgs, more, err := server.configs.Range(context.Background(), from, end, &sortOption); err == nil {
@@ -58,7 +58,7 @@ type PutResult struct {
 func (server *APIServer) PutConfig(c echo.Context) error {
 	value := c.Form("value")
 	if value == "" {
-		return JsonErrorf(c, comm.EcodeInvalidParam, "invalid value")
+		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid value")
 	}
 	version, ok, err := IntFormParamD(c, "version", 0)
 	if !ok {
@@ -85,7 +85,7 @@ func (server *APIServer) Watch(c echo.Context) error {
 	var timeout time.Duration
 	if c.Query("timeout") != "" {
 		if timeout, err = time.ParseDuration(c.Query("timeout")); err != nil {
-			return JsonErrorf(c, comm.EcodeInvalidParam, "invalid timeout")
+			return JsonErrorf(c, utils.EcodeInvalidParam, "invalid timeout")
 		}
 	} else {
 		timeout = DefaultWatchTimeout * time.Second

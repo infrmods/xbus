@@ -1,4 +1,4 @@
-package comm
+package utils
 
 func RangeEndKey(key string) string {
 	data := []byte(key)

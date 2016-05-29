@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/infrmods/xbus/comm"
+	"github.com/infrmods/xbus/utils"
 	"github.com/labstack/echo"
 	"net/http"
 )
@@ -23,8 +23,8 @@ func JsonResult(c echo.Context, result interface{}) error {
 
 func JsonError(c echo.Context, err error) error {
 	code := http.StatusOK
-	if e, ok := err.(*comm.Error); ok {
-		if e.Code == comm.EcodeSystemError {
+	if e, ok := err.(*utils.Error); ok {
+		if e.Code == utils.EcodeSystemError {
 			code = http.StatusServiceUnavailable
 		}
 	}
@@ -36,6 +36,6 @@ func JsonErrorC(c echo.Context, code int, err error) error {
 }
 
 func JsonErrorf(c echo.Context, errCode string, format string, args ...interface{}) error {
-	err := comm.Errorf(errCode, format, args...)
+	err := utils.Errorf(errCode, format, args...)
 	return JsonError(c, err)
 }

@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/coreos/etcd/clientv3"
-	"github.com/infrmods/xbus/comm"
+	"github.com/infrmods/xbus/utils"
 	"github.com/infrmods/xbus/services"
 	"github.com/labstack/echo"
 	"golang.org/x/net/context"
@@ -25,7 +25,7 @@ func (server *APIServer) PulgService(c echo.Context) error {
 		return err
 	}
 	if ttl > 0 && ttl < MinServiceTTL {
-		return JsonErrorf(c, comm.EcodeInvalidParam, "invalid ttl: %d", ttl)
+		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
 	}
 	var desc services.ServiceDesc
 	if ok, err := JsonFormParam(c, "desc", &desc); !ok {
@@ -100,7 +100,7 @@ func (server *APIServer) WatchService(c echo.Context) error {
 	var timeout time.Duration
 	if c.Query("timeout") != "" {
 		if timeout, err = time.ParseDuration(c.Query("timeout")); err != nil {
-			return JsonErrorf(c, comm.EcodeInvalidParam, "invalid timeout")
+			return JsonErrorf(c, utils.EcodeInvalidParam, "invalid timeout")
 		}
 	} else {
 		timeout = DefaultWatchTimeout * time.Second

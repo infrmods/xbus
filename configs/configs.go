@@ -4,7 +4,7 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/golang/glog"
-	"github.com/infrmods/xbus/comm"
+	"github.com/infrmods/xbus/utils"
 	"golang.org/x/net/context"
 	"strings"
 )
@@ -63,7 +63,7 @@ func (ctrl *ConfigCtrl) Range(ctx context.Context, from, end string, sortOption 
 		}
 		return cfgs, resp.More, nil
 	} else {
-		return nil, false, comm.CleanErr(err, "", "get range(%s, %s) fail: %v", from, end, err)
+		return nil, false, utils.CleanErr(err, "", "get range(%s, %s) fail: %v", from, end, err)
 	}
 }
 
@@ -74,12 +74,12 @@ func (ctrl *ConfigCtrl) Get(ctx context.Context, name string) (*ConfigItem, int6
 
 	if resp, err := ctrl.etcdClient.Get(ctx, ctrl.configKey(name)); err == nil {
 		if resp.Kvs == nil {
-			return nil, 0, comm.NewError(comm.EcodeNotFound, "")
+			return nil, 0, utils.NewError(utils.EcodeNotFound, "")
 		}
 		cfg := configFromKv(name, resp.Kvs[0])
 		return &cfg, resp.Header.Revision, nil
 	} else {
-		return nil, 0, comm.CleanErr(err, "", "get config key(%s) fail: %v", name, err)
+		return nil, 0, utils.CleanErr(err, "", "get config key(%s) fail: %v", name, err)
 	}
 }
 
@@ -98,15 +98,15 @@ func (ctrl *ConfigCtrl) Put(ctx context.Context, name, value string, version int
 		if resp, err := ctrl.etcdClient.Put(ctx, key, value); err == nil {
 			return resp.Header.Revision, nil
 		} else {
-			return 0, comm.CleanErr(err, "", "put config key(%s) fail: %v", name, err)
+			return 0, utils.CleanErr(err, "", "put config key(%s) fail: %v", name, err)
 		}
 	} else {
 		cmp := clientv3.Compare(clientv3.Version(key), "=", version)
 		opPut := clientv3.OpPut(key, value)
 		if resp, err := ctrl.etcdClient.Txn(ctx).If(cmp).Then(opPut).Commit(); err != nil {
-			return 0, comm.CleanErr(err, "", "put config key(%s) with version(%d) fail: %v", name, version, err)
+			return 0, utils.CleanErr(err, "", "put config key(%s) with version(%d) fail: %v", name, version, err)
 		} else if !resp.Succeeded {
-			return 0, comm.NewError(comm.EcodeInvalidVersion, "")
+			return 0, utils.NewError(utils.EcodeInvalidVersion, "")
 		} else {
 			return resp.Header.Revision, nil
 		}
@@ -129,7 +129,7 @@ func (ctrl *ConfigCtrl) Watch(ctx context.Context, name string, revision int64) 
 	}
 	resp := <-watchCh
 	if err := resp.Err(); err != nil {
-		return nil, 0, comm.CleanErr(err, "", "watch key(%s) with revision(%d) fail: %v", name, revision, err)
+		return nil, 0, utils.CleanErr(err, "", "watch key(%s) with revision(%d) fail: %v", name, revision, err)
 	}
 	if resp.Canceled || resp.Events == nil {
 		return nil, resp.Header.Revision, nil
@@ -140,8 +140,8 @@ func (ctrl *ConfigCtrl) Watch(ctx context.Context, name string, revision int64) 
 			cfg := configFromKv(name, event.Kv)
 			return &cfg, resp.Header.Revision, nil
 		case mvccpb.EXPIRE, mvccpb.DELETE:
-			return nil, 0, comm.NewError(comm.EcodeDeleted, "")
+			return nil, 0, utils.NewError(utils.EcodeDeleted, "")
 		}
 	}
-	return nil, 0, comm.NewError(comm.EcodeSystemError, "unexpected event")
+	return nil, 0, utils.NewError(utils.EcodeSystemError, "unexpected event")
 }

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
-	"github.com/infrmods/xbus/comm"
+	"github.com/infrmods/xbus/utils"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"strings"
@@ -22,7 +22,7 @@ func (desc *ServiceDesc) Marshal() ([]byte, error) {
 		return data, nil
 	} else {
 		glog.Errorf("marshal service-desc(%#v) fail: %v", desc, err)
-		return nil, comm.NewError(comm.EcodeSystemError, "marshal service-desc fail")
+		return nil, utils.NewError(utils.EcodeSystemError, "marshal service-desc fail")
 	}
 }
 
@@ -36,7 +36,7 @@ func (endpoint *ServiceEndpoint) Marshal() ([]byte, error) {
 		return data, nil
 	} else {
 		glog.Errorf("marshal endpoint(%#v) fail: %v", endpoint, err)
-		return nil, comm.NewError(comm.EcodeSystemError, "marshal endpoint fail")
+		return nil, utils.NewError(utils.EcodeSystemError, "marshal endpoint fail")
 	}
 }
 
@@ -68,10 +68,10 @@ func (ctrl *ServiceCtrl) Plug(ctx context.Context, name, version string,
 		return 0, err
 	}
 	if desc.Type == "" {
-		return 0, comm.NewError(comm.EcodeInvalidEndpoint, "missing type")
+		return 0, utils.NewError(utils.EcodeInvalidEndpoint, "missing type")
 	}
 	if endpoint.Address == "" {
-		return 0, comm.NewError(comm.EcodeInvalidEndpoint, "missing address")
+		return 0, utils.NewError(utils.EcodeInvalidEndpoint, "missing address")
 	}
 	if err := checkAddress(endpoint.Address); err != nil {
 		return 0, err
@@ -98,7 +98,7 @@ func (ctrl *ServiceCtrl) Unplug(ctx context.Context, name, version, addr string)
 	}
 	if _, err := ctrl.etcdClient.Delete(ctx, ctrl.serviceKey(name, version, addr)); err != nil {
 		glog.Errorf("delete key(%s) fail: %v", ctrl.serviceKey(name, version, addr), err)
-		return comm.NewError(comm.EcodeSystemError, "delete key fail")
+		return utils.NewError(utils.EcodeSystemError, "delete key fail")
 	}
 	return nil
 }
@@ -125,9 +125,9 @@ func (ctrl *ServiceCtrl) Update(ctx context.Context, name, version, addr string,
 		if resp.Succeeded {
 			return nil
 		}
-		return comm.NewError(comm.EcodeNotFound, "")
+		return utils.NewError(utils.EcodeNotFound, "")
 	} else {
-		return comm.CleanErr(err, "update fail", "tnx update(%s) fail: %v", key, err)
+		return utils.CleanErr(err, "update fail", "tnx update(%s) fail: %v", key, err)
 	}
 }
 
@@ -139,9 +139,9 @@ func (ctrl *ServiceCtrl) KeepAlive(ctx context.Context, name, version, addr stri
 		return err
 	}
 	if _, err := ctrl.etcdClient.Lease.KeepAliveOnce(ctx, keepId); err != nil {
-		code, err := comm.CleanErrWithCode(err, "keepalive fail", "KeepAliveOnce(%d) fail: %#v", keepId, err)
+		code, err := utils.CleanErrWithCode(err, "keepalive fail", "KeepAliveOnce(%d) fail: %#v", keepId, err)
 		if code == codes.NotFound {
-			return comm.NewError(comm.EcodeNotFound, "keepId not found")
+			return utils.NewError(utils.EcodeNotFound, "keepId not found")
 		}
 		return err
 	}
@@ -164,7 +164,7 @@ func (ctrl *ServiceCtrl) query(ctx context.Context, key string) (*Service, int64
 			return nil, 0, err
 		}
 	} else {
-		return nil, 0, comm.CleanErr(err, "query fail", "Query(%s) fail: %v", key, err)
+		return nil, 0, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", key, err)
 	}
 }
 

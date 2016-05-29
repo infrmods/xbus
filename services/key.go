@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
-	"github.com/infrmods/xbus/comm"
+	"github.com/infrmods/xbus/utils"
 	"golang.org/x/net/context"
 	"regexp"
 	"time"
@@ -15,10 +15,10 @@ var rValidVersion = regexp.MustCompile(`(?i)^[a-z0-9][a-z0-9_.-]*$`)
 
 func checkNameVersion(name, version string) error {
 	if !rValidName.MatchString(name) {
-		return comm.NewError(comm.EcodeInvalidName, "")
+		return utils.NewError(utils.EcodeInvalidName, "")
 	}
 	if !rValidVersion.MatchString(version) {
-		return comm.NewError(comm.EcodeInvalidVersion, "")
+		return utils.NewError(utils.EcodeInvalidVersion, "")
 	}
 	return nil
 }
@@ -27,7 +27,7 @@ var rValidAddress = regexp.MustCompile(`(?i)^[a-z0-9:_-]+$`)
 
 func checkAddress(addr string) error {
 	if !rValidAddress.MatchString(addr) {
-		return comm.NewError(comm.EcodeInvalidAddress, "")
+		return utils.NewError(utils.EcodeInvalidAddress, "")
 	}
 	return nil
 }
@@ -73,19 +73,19 @@ func (ctrl *ServiceCtrl) ensureServiceDesc(ctx context.Context, name, version, v
 							}
 							continue
 						} else {
-							return comm.CleanErr(err, "put service-desc fail", "put service-desc fail: %v", err)
+							return utils.CleanErr(err, "put service-desc fail", "put service-desc fail: %v", err)
 						}
 					}
-					return comm.NewError(comm.EcodeChangedServiceDesc, "service-desc can't be change")
+					return utils.NewError(utils.EcodeChangedServiceDesc, "service-desc can't be change")
 				}
 			}
 			glog.Errorf("ensureServiceDesc fail, get invalid response: %v", resp)
-			return comm.NewError(comm.EcodeSystemError, "unexpected old service-desc")
+			return utils.NewError(utils.EcodeSystemError, "unexpected old service-desc")
 		} else {
-			return comm.CleanErr(err, "put service-desc fail", "exec service-desc check txn fail: %v", err)
+			return utils.CleanErr(err, "put service-desc fail", "exec service-desc check txn fail: %v", err)
 		}
 	}
-	return comm.NewError(comm.EcodeTooManyAttempts, "put service-desc fail: too many attempts")
+	return utils.NewError(utils.EcodeTooManyAttempts, "put service-desc fail: too many attempts")
 }
 
 func (ctrl *ServiceCtrl) newServiceNode(ctx context.Context, ttl time.Duration,
@@ -102,7 +102,7 @@ func (ctrl *ServiceCtrl) newServiceNode(ctx context.Context, ttl time.Duration,
 				}
 			}()
 		} else {
-			return 0, comm.CleanErr(err, "create lease fail", "create lease fail: %v", err)
+			return 0, utils.CleanErr(err, "create lease fail", "create lease fail: %v", err)
 		}
 	}
 
@@ -114,7 +114,7 @@ func (ctrl *ServiceCtrl) newServiceNode(ctx context.Context, ttl time.Duration,
 	}
 
 	if err != nil {
-		return 0, comm.CleanErr(err, "create unique key fail",
+		return 0, utils.CleanErr(err, "create unique key fail",
 			"Txn(create unique key(%s)) fail: %v", key, err)
 	}
 	return leaseId, nil
