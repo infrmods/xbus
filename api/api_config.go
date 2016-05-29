@@ -3,14 +3,15 @@ package api
 import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/infrmods/xbus/comm"
+	"github.com/infrmods/xbus/configs"
 	"github.com/labstack/echo"
 	"golang.org/x/net/context"
 	"time"
 )
 
 type RangeResult struct {
-	Configs []comm.Config `json:"configs"`
-	More    bool          `json:"more"`
+	Configs []configs.ConfigItem `json:"configs"`
+	More    bool                 `json:"more"`
 }
 
 func (server *APIServer) RangeConfigs(c echo.Context) error {
@@ -34,8 +35,8 @@ func (server *APIServer) RangeConfigs(c echo.Context) error {
 }
 
 type GetResult struct {
-	Config   *comm.Config `json:"config"`
-	Revision int64        `json:"revision"`
+	Config   *configs.ConfigItem `json:"config"`
+	Revision int64               `json:"revision"`
 }
 
 func (server *APIServer) GetConfig(c echo.Context) error {
@@ -72,8 +73,8 @@ func (server *APIServer) PutConfig(c echo.Context) error {
 }
 
 type WatchResult struct {
-	Config   *comm.Config `json:"config"`
-	Revision int64        `json:"revision"`
+	Config   *configs.ConfigItem `json:"config"`
+	Revision int64               `json:"revision"`
 }
 
 func (server *APIServer) Watch(c echo.Context) error {

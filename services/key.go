@@ -32,24 +32,28 @@ func checkAddress(addr string) error {
 	return nil
 }
 
-func (services *Services) serviceKeyPrefix(name, version string) string {
-	return fmt.Sprintf("%s/%s/%s", services.config.KeyPrefix, name, version)
+func (ctrl *ServiceCtrl) serviceKeyPrefix(name, version string) string {
+	return fmt.Sprintf("%s/%s/%s", ctrl.config.KeyPrefix, name, version)
 }
 
-func (services *Services) serviceDescKey(name, version string) string {
-	return fmt.Sprintf("%s/%s/%s/desc", services.config.KeyPrefix, name, version)
+var serviceDescNodeKey = "desc"
+
+func (ctrl *ServiceCtrl) serviceDescKey(name, version string) string {
+	return fmt.Sprintf("%s/%s/%s/desc", ctrl.config.KeyPrefix, name, version)
 }
 
-func (services *Services) serviceKey(name, version, addr string) string {
-	return fmt.Sprintf("%s/%s/%s/node_%s", services.config.KeyPrefix, name, version, addr)
+var serviceKeyNodePrefix = "node_"
+
+func (ctrl *ServiceCtrl) serviceKey(name, version, addr string) string {
+	return fmt.Sprintf("%s/%s/%s/node_%s", ctrl.config.KeyPrefix, name, version, addr)
 }
 
 const MAX_NEW_UNIQUE_TRY = 3
 
-func (services *Services) ensureServiceDesc(ctx context.Context, name, version, value string) error {
-	key := services.serviceDescKey(name, version)
+func (ctrl *ServiceCtrl) ensureServiceDesc(ctx context.Context, name, version, value string) error {
+	key := ctrl.serviceDescKey(name, version)
 	for i := 0; i < MAX_NEW_UNIQUE_TRY; i++ {
-		txn := services.etcdClient.Txn(ctx).If(
+		txn := ctrl.etcdClient.Txn(ctx).If(
 			clientv3.Compare(clientv3.Value(key), "=", value),
 		).Then().Else(clientv3.OpGet(key))
 
@@ -60,7 +64,7 @@ func (services *Services) ensureServiceDesc(ctx context.Context, name, version, 
 			if len(resp.Responses) == 1 {
 				if rangeResp := resp.Responses[0].GetResponseRange(); rangeResp != nil {
 					if len(rangeResp.Kvs) == 0 {
-						txn := services.etcdClient.Txn(ctx).If(
+						txn := ctrl.etcdClient.Txn(ctx).If(
 							clientv3.Compare(clientv3.Version(key), "=", 0),
 						).Then(clientv3.OpPut(key, value))
 						if resp, err := txn.Commit(); err == nil {
@@ -84,15 +88,15 @@ func (services *Services) ensureServiceDesc(ctx context.Context, name, version, 
 	return comm.NewError(comm.EcodeTooManyAttempts, "put service-desc fail: too many attempts")
 }
 
-func (services *Services) newServiceNode(ctx context.Context, ttl time.Duration,
+func (ctrl *ServiceCtrl) newServiceNode(ctx context.Context, ttl time.Duration,
 	key, value string) (leaseId clientv3.LeaseID, rerr error) {
 	if ttl > 0 {
-		if resp, err := services.etcdClient.Lease.Grant(ctx, int64(ttl.Seconds())); err == nil {
+		if resp, err := ctrl.etcdClient.Lease.Grant(ctx, int64(ttl.Seconds())); err == nil {
 			leaseId = clientv3.LeaseID(resp.ID)
 			defer func() {
 				if rerr != nil {
 					leaseId = 0
-					if _, err := services.etcdClient.Revoke(context.Background(), leaseId); err != nil {
+					if _, err := ctrl.etcdClient.Revoke(context.Background(), leaseId); err != nil {
 						glog.Errorf("revoke lease(%d) fail: %v", leaseId, err)
 					}
 				}
@@ -104,9 +108,9 @@ func (services *Services) newServiceNode(ctx context.Context, ttl time.Duration,
 
 	var err error
 	if ttl > 0 {
-		_, err = services.etcdClient.Put(ctx, key, value, clientv3.WithLease(leaseId))
+		_, err = ctrl.etcdClient.Put(ctx, key, value, clientv3.WithLease(leaseId))
 	} else {
-		_, err = services.etcdClient.Put(ctx, key, value)
+		_, err = ctrl.etcdClient.Put(ctx, key, value)
 	}
 
 	if err != nil {

@@ -26,10 +26,10 @@ func checkNamePrefix(name string) error {
 	return nil
 }
 
-func (configs *Configs) configKey(name string) string {
-	return fmt.Sprintf("%s/%s", configs.config.KeyPrefix, name)
+func (ctrl *ConfigCtrl) configKey(name string) string {
+	return fmt.Sprintf("%s/%s", ctrl.config.KeyPrefix, name)
 }
 
-func (configs *Configs) endKey() string {
-	return comm.RangeEndKey(configs.config.KeyPrefix)
+func (ctrl *ConfigCtrl) endKey() string {
+	return comm.RangeEndKey(ctrl.config.KeyPrefix)
 }

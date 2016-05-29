@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/infrmods/xbus/comm"
+	"github.com/infrmods/xbus/services"
 	"github.com/labstack/echo"
 	"golang.org/x/net/context"
 	"time"
@@ -26,11 +27,11 @@ func (server *APIServer) PulgService(c echo.Context) error {
 	if ttl > 0 && ttl < MinServiceTTL {
 		return JsonErrorf(c, comm.EcodeInvalidParam, "invalid ttl: %d", ttl)
 	}
-	var desc comm.ServiceDesc
+	var desc services.ServiceDesc
 	if ok, err := JsonFormParam(c, "desc", &desc); !ok {
 		return err
 	}
-	var endpoint comm.ServiceEndpoint
+	var endpoint services.ServiceEndpoint
 	if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
 		return err
 	}
@@ -54,7 +55,7 @@ func (server *APIServer) UnplugService(c echo.Context) error {
 
 func (server *APIServer) UpdateService(c echo.Context) error {
 	if c.Form("endpoint") != "" {
-		var endpoint comm.ServiceEndpoint
+		var endpoint services.ServiceEndpoint
 		if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
 			return err
 		}
@@ -75,17 +76,17 @@ func (server *APIServer) UpdateService(c echo.Context) error {
 }
 
 type QueryResult struct {
-	Endpoints []comm.ServiceEndpoint `json:"endpoints"`
-	Revision  int64                  `json:"revision"`
+	Service  *services.Service `json:"service"`
+	Revision int64             `json:"revision"`
 }
 
 func (server *APIServer) QueryService(c echo.Context) error {
 	if c.Query("watch") == "true" {
 		return server.WatchService(c)
 	}
-	if endpoints, rev, err := server.services.Query(context.Background(),
+	if service, rev, err := server.services.Query(context.Background(),
 		c.P(0), c.P(1)); err == nil {
-		return JsonResult(c, QueryResult{Endpoints: endpoints, Revision: rev})
+		return JsonResult(c, QueryResult{Service: service, Revision: rev})
 	} else {
 		return JsonError(c, err)
 	}
@@ -107,9 +108,9 @@ func (server *APIServer) WatchService(c echo.Context) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
 	defer cancelFunc()
 
-	if endpoints, rev, err := server.services.Watch(ctx,
+	if service, rev, err := server.services.Watch(ctx,
 		c.P(0), c.P(1), revision); err == nil {
-		return JsonResult(c, QueryResult{Endpoints: endpoints, Revision: rev})
+		return JsonResult(c, QueryResult{Service: service, Revision: rev})
 	} else {
 		return JsonError(c, err)
 	}

@@ -19,12 +19,12 @@ type Config struct {
 
 type APIServer struct {
 	config   Config
-	services *services.Services
-	configs  *configs.Configs
+	services *services.ServiceCtrl
+	configs  *configs.ConfigCtrl
 	httpdown.Server
 }
 
-func NewAPIServer(config *Config, servs *services.Services, cfgs *configs.Configs) *APIServer {
+func NewAPIServer(config *Config, servs *services.ServiceCtrl, cfgs *configs.ConfigCtrl) *APIServer {
 	server := &APIServer{config: *config, services: servs, configs: cfgs}
 	return server
 }

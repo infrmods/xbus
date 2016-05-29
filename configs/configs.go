@@ -9,17 +9,23 @@ import (
 	"strings"
 )
 
+type ConfigItem struct {
+	Name    string `json:"name"`
+	Value   string `json:"value"`
+	Version int64  `json:"version"`
+}
+
 type Config struct {
 	KeyPrefix string `default:"/configs" yaml:"key_prefix"`
 }
 
-type Configs struct {
+type ConfigCtrl struct {
 	config     Config
 	etcdClient *clientv3.Client
 }
 
-func NewConfigs(config *Config, etcdClient *clientv3.Client) *Configs {
-	configs := &Configs{config: *config, etcdClient: etcdClient}
+func NewConfigs(config *Config, etcdClient *clientv3.Client) *ConfigCtrl {
+	configs := &ConfigCtrl{config: *config, etcdClient: etcdClient}
 	if strings.HasSuffix(configs.config.KeyPrefix, "/") {
 		configs.config.KeyPrefix = configs.config.KeyPrefix[:len(configs.config.KeyPrefix)-1]
 	}
@@ -28,28 +34,28 @@ func NewConfigs(config *Config, etcdClient *clientv3.Client) *Configs {
 
 const RANGE_LIMIT = 20
 
-func (configs *Configs) Range(ctx context.Context, from, end string, sortOption *clientv3.SortOption) ([]comm.Config, bool, error) {
+func (ctrl *ConfigCtrl) Range(ctx context.Context, from, end string, sortOption *clientv3.SortOption) ([]ConfigItem, bool, error) {
 	if err := checkNamePrefix(from); err != nil {
 		return nil, false, err
 	}
 	if err := checkNamePrefix(end); err != nil {
 		return nil, false, err
 	}
-	fromKey := configs.configKey(from)
-	endKey := configs.configKey(end)
+	fromKey := ctrl.configKey(from)
+	endKey := ctrl.configKey(end)
 	if end == "" {
-		endKey = configs.endKey()
+		endKey = ctrl.endKey()
 	}
 
-	if resp, err := configs.etcdClient.Get(
+	if resp, err := ctrl.etcdClient.Get(
 		ctx, fromKey, clientv3.WithRange(endKey),
 		clientv3.WithSort(sortOption.Target, sortOption.Order),
 		clientv3.WithLimit(RANGE_LIMIT)); err == nil {
-		cfgs := make([]comm.Config, 0, len(resp.Kvs))
+		cfgs := make([]ConfigItem, 0, len(resp.Kvs))
 		for _, kv := range resp.Kvs {
 			key := string(kv.Key)
-			if strings.HasPrefix(key, configs.config.KeyPrefix) {
-				name := key[len(configs.config.KeyPrefix)+1:]
+			if strings.HasPrefix(key, ctrl.config.KeyPrefix) {
+				name := key[len(ctrl.config.KeyPrefix)+1:]
 				cfgs = append(cfgs, configFromKv(name, kv))
 			} else {
 				glog.Errorf("invalid key from range(%s, %s): %s", from, end, key)
@@ -61,12 +67,12 @@ func (configs *Configs) Range(ctx context.Context, from, end string, sortOption 
 	}
 }
 
-func (configs *Configs) Get(ctx context.Context, name string) (*comm.Config, int64, error) {
+func (ctrl *ConfigCtrl) Get(ctx context.Context, name string) (*ConfigItem, int64, error) {
 	if err := checkName(name); err != nil {
 		return nil, 0, err
 	}
 
-	if resp, err := configs.etcdClient.Get(ctx, configs.configKey(name)); err == nil {
+	if resp, err := ctrl.etcdClient.Get(ctx, ctrl.configKey(name)); err == nil {
 		if resp.Kvs == nil {
 			return nil, 0, comm.NewError(comm.EcodeNotFound, "")
 		}
@@ -77,19 +83,19 @@ func (configs *Configs) Get(ctx context.Context, name string) (*comm.Config, int
 	}
 }
 
-func configFromKv(name string, kv *mvccpb.KeyValue) comm.Config {
-	return comm.Config{Name: name,
+func configFromKv(name string, kv *mvccpb.KeyValue) ConfigItem {
+	return ConfigItem{Name: name,
 		Value:   string(kv.Value),
 		Version: kv.Version}
 }
 
-func (configs *Configs) Put(ctx context.Context, name, value string, version int64) (int64, error) {
+func (ctrl *ConfigCtrl) Put(ctx context.Context, name, value string, version int64) (int64, error) {
 	if err := checkName(name); err != nil {
 		return 0, err
 	}
-	key := configs.configKey(name)
+	key := ctrl.configKey(name)
 	if version < 0 {
-		if resp, err := configs.etcdClient.Put(ctx, key, value); err == nil {
+		if resp, err := ctrl.etcdClient.Put(ctx, key, value); err == nil {
 			return resp.Header.Revision, nil
 		} else {
 			return 0, comm.CleanErr(err, "", "put config key(%s) fail: %v", name, err)
@@ -97,7 +103,7 @@ func (configs *Configs) Put(ctx context.Context, name, value string, version int
 	} else {
 		cmp := clientv3.Compare(clientv3.Version(key), "=", version)
 		opPut := clientv3.OpPut(key, value)
-		if resp, err := configs.etcdClient.Txn(ctx).If(cmp).Then(opPut).Commit(); err != nil {
+		if resp, err := ctrl.etcdClient.Txn(ctx).If(cmp).Then(opPut).Commit(); err != nil {
 			return 0, comm.CleanErr(err, "", "put config key(%s) with version(%d) fail: %v", name, version, err)
 		} else if !resp.Succeeded {
 			return 0, comm.NewError(comm.EcodeInvalidVersion, "")
@@ -107,14 +113,14 @@ func (configs *Configs) Put(ctx context.Context, name, value string, version int
 	}
 }
 
-func (configs *Configs) Watch(ctx context.Context, name string, revision int64) (*comm.Config, int64, error) {
+func (ctrl *ConfigCtrl) Watch(ctx context.Context, name string, revision int64) (*ConfigItem, int64, error) {
 	if err := checkName(name); err != nil {
 		return nil, 0, err
 	}
-	watcher := clientv3.NewWatcher(configs.etcdClient)
+	watcher := clientv3.NewWatcher(ctrl.etcdClient)
 	defer watcher.Close()
 
-	key := configs.configKey(name)
+	key := ctrl.configKey(name)
 	var watchCh clientv3.WatchChan
 	if revision > 0 {
 		watchCh = watcher.Watch(ctx, key, clientv3.WithRev(revision))
