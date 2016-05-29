@@ -54,7 +54,7 @@ type ServiceCtrl struct {
 	etcdClient *clientv3.Client
 }
 
-func NewServices(config *Config, etcdClient *clientv3.Client) *ServiceCtrl {
+func NewServiceCtrl(config *Config, etcdClient *clientv3.Client) *ServiceCtrl {
 	services := &ServiceCtrl{config: *config, etcdClient: etcdClient}
 	if strings.HasSuffix(services.config.KeyPrefix, "/") {
 		services.config.KeyPrefix = services.config.KeyPrefix[:len(services.config.KeyPrefix)-1]

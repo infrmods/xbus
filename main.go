@@ -6,9 +6,9 @@ import (
 	"github.com/gocomm/config"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/api"
-	"github.com/infrmods/xbus/utils"
 	"github.com/infrmods/xbus/configs"
 	"github.com/infrmods/xbus/services"
+	"github.com/infrmods/xbus/utils"
 	"gopkg.in/yaml.v2"
 )
 
@@ -46,8 +46,8 @@ func main() {
 		return
 	}
 
-	services := services.NewServices(&cfg.Services, etcdClient)
-	configs := configs.NewConfigs(&cfg.Configs, etcdClient)
+	services := services.NewServiceCtrl(&cfg.Services, etcdClient)
+	configs := configs.NewConfigCtrl(&cfg.Configs, etcdClient)
 	apiServer := api.NewAPIServer(&cfg.Api, services, configs)
 	if err := apiServer.Start(); err != nil {
 		glog.Errorf("start api_sersver fail: %v", err)

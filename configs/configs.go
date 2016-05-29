@@ -24,7 +24,7 @@ type ConfigCtrl struct {
 	etcdClient *clientv3.Client
 }
 
-func NewConfigs(config *Config, etcdClient *clientv3.Client) *ConfigCtrl {
+func NewConfigCtrl(config *Config, etcdClient *clientv3.Client) *ConfigCtrl {
 	configs := &ConfigCtrl{config: *config, etcdClient: etcdClient}
 	if strings.HasSuffix(configs.config.KeyPrefix, "/") {
 		configs.config.KeyPrefix = configs.config.KeyPrefix[:len(configs.config.KeyPrefix)-1]
