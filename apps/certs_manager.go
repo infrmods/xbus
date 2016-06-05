@@ -93,7 +93,7 @@ func NewCertsCtrl(config *CertsConfig, serialGenerator SerialGenerator) (*CertsC
 	return mgr, nil
 }
 
-func (mgr *CertsCtrl) NewCert(pubkey interface{}, subject pkix.Name,
+func (mgr *CertsCtrl) NewCert(pubkey crypto.PublicKey, subject pkix.Name,
 	dnsNames []string, days int) ([]byte, error) {
 	serialNumber, err := mgr.serialGenerator.Generate()
 	if err != nil {
