@@ -69,10 +69,28 @@
 			"revisionTime": "2016-03-07T21:52:05Z"
 		},
 		{
+			"checksumSHA1": "o3m/7Mwry8k86MHWiFnntFDuSgk=",
+			"path": "github.com/go-sql-driver/mysql",
+			"revision": "527bcd55aab2e53314f1a150922560174b493034",
+			"revisionTime": "2015-09-08T12:46:01Z"
+		},
+		{
 			"checksumSHA1": "RFJgRr9hdt3rAZ/ZyhkpXAlTS8Q=",
 			"path": "github.com/gocomm/config",
 			"revision": "b6ef2b8450a7d2439c0ec37a3c162bdfbb362d70",
 			"revisionTime": "2016-03-22T08:31:58Z"
+		},
+		{
+			"checksumSHA1": "xyhw4dqNDxvdxvcjpqGjh03d2ZM=",
+			"path": "github.com/gocomm/dbutil",
+			"revision": "23013e47b0e057ca980af7e0df871c3bbb17ce82",
+			"revisionTime": "2016-06-05T07:50:16Z"
+		},
+		{
+			"checksumSHA1": "dJ3riA4z2KuYi3rN/TBpd2fwdQU=",
+			"path": "github.com/gocomm/dbutil/dialects/mysql",
+			"revision": "23013e47b0e057ca980af7e0df871c3bbb17ce82",
+			"revisionTime": "2016-06-05T07:50:16Z"
 		},
 		{
 			"checksumSHA1": "N3LXf9Vm2RM0AE3DjhCmpiyK4Bc=",

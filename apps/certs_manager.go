@@ -93,6 +93,12 @@ func NewCertsCtrl(config *CertsConfig, serialGenerator SerialGenerator) (*CertsC
 	return mgr, nil
 }
 
+func (mgr *CertsCtrl) CertPool() *x509.CertPool {
+	pool := x509.NewCertPool()
+	pool.AddCert(mgr.rootCert)
+	return pool
+}
+
 func (mgr *CertsCtrl) NewCert(pubkey crypto.PublicKey, subject pkix.Name,
 	dnsNames []string, days int) ([]byte, error) {
 	serialNumber, err := mgr.serialGenerator.Generate()

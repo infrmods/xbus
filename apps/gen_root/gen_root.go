@@ -5,9 +5,9 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/pem"
 	"flag"
 	"fmt"
+	"github.com/infrmods/xbus/utils"
 	"math/big"
 	"os"
 	"time"
@@ -40,9 +40,10 @@ func main() {
 			Organization: []string{*orgName},
 			CommonName:   *commName,
 		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(time.Duration(*years) * time.Hour * 24 * 30 * 12),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(time.Duration(*years) * time.Hour * 24 * 365),
+		KeyUsage:  x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+
 		BasicConstraintsValid: true,
 		IsCA: true,
 	}
@@ -53,28 +54,13 @@ func main() {
 		os.Exit(-1)
 	}
 
-	certFile, err := os.Create(*certFile)
-	if err != nil {
-		fmt.Printf("create cert file fail: %v\n", err)
-		os.Exit(-1)
-	}
-	err = pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	certFile.Close()
-	if err != nil {
-		fmt.Printf("write cert file fail: %v\n", err)
+	if err := utils.WriteCert(*certFile, 0644, derBytes); err != nil {
+		fmt.Printf("write cert fail: %v\n", err)
 		os.Exit(-1)
 	}
 
-	keyFile, err := os.Create(*keyFile)
-	if err != nil {
-		fmt.Printf("create key file fail: %v\n", err)
-		os.Exit(-1)
-	}
-	err = pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privKey)})
-	keyFile.Close()
-	if err != nil {
-		fmt.Printf("write key file fail: %v\n", err)
+	if err := utils.WritePrivateKey(*keyFile, 0600, privKey); err != nil {
+		fmt.Printf("write key fail: %v\n", err)
 		os.Exit(-1)
 	}
 }

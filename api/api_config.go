@@ -2,8 +2,8 @@ package api
 
 import (
 	"github.com/coreos/etcd/clientv3"
-	"github.com/infrmods/xbus/utils"
 	"github.com/infrmods/xbus/configs"
+	"github.com/infrmods/xbus/utils"
 	"github.com/labstack/echo"
 	"golang.org/x/net/context"
 	"time"

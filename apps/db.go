@@ -12,6 +12,7 @@ import (
 
 type App struct {
 	Id          int64     `json:"-"`
+	Status      int       `json:"status"`
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
 	Cert        string    `json:"cert"`
@@ -38,8 +39,8 @@ func (app *App) Certificate() (*x509.Certificate, error) {
 
 func InsertApp(db *sql.DB, app *App) error {
 	if id, err := dbutil.Insert(db,
-		`insert into apps(name, description, cert)
-         values(?,?,?)`, app.Name, app.Description, app.Cert); err == nil {
+		`insert into apps(status, name, description, cert)
+         values(?, ?, ?, ?)`, app.Status, app.Name, app.Description, app.Cert); err == nil {
 		app.Id = id
 		return nil
 	} else {
@@ -61,6 +62,7 @@ func GetAppByName(db *sql.DB, name string) (*App, error) {
 
 type Group struct {
 	Id          int64     `json:"-"`
+	Status      int       `json:"status"`
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
 	CreateTime  time.Time `json:"create_time"`
@@ -69,8 +71,8 @@ type Group struct {
 
 func InsertGroup(db *sql.DB, group *Group) error {
 	if id, err := dbutil.Insert(db,
-		`insert into groups(name, description)
-         values(?, ?)`, group.Name, group.Description); err == nil {
+		`insert into groups(status, name, description)
+         values(?, ?, ?)`, group.Status, group.Name, group.Description); err == nil {
 		group.Id = id
 		return nil
 	} else {
@@ -122,16 +124,19 @@ const (
 
 type Perm struct {
 	Id         int64
+	PermType   int
 	TargetType int
 	TargetId   int64
+	CanWrite   bool
 	Content    string
 	CreateTime time.Time
 }
 
 func InsertPerm(db *sql.DB, perm *Perm) error {
 	if id, err := dbutil.Insert(db,
-		`insert ignore into perms(target_type, target_id, content)
-         values(?, ?, ?)`, perm.TargetType, perm.TargetId, perm.Content); err == nil {
+		`insert ignore into perms(perm_type, target_type, target_id, can_write, content)
+         values(?, ?, ?, ?, ?)`, perm.PermType, perm.TargetType, perm.TargetId,
+		perm.CanWrite, perm.Content); err == nil {
 		perm.Id = id
 		return nil
 	} else if err == dbutil.ZeroEffected {
@@ -141,28 +146,41 @@ func InsertPerm(db *sql.DB, perm *Perm) error {
 	}
 }
 
-func HasAnyPerm(db *sql.DB, groupId, appId int64, content string) (bool, error) {
+func HasAnyPerm(db *sql.DB, typ int, appId int64, groupIds []int64, needWrite bool, content string) (bool, error) {
+	var extra string
+	if needWrite {
+		extra = ` and can_write=true`
+	}
 	var count int64
 	if err := dbutil.Query(db, &count,
 		`select count(*) from perms
-         where (target_type=? and target_id=? and content=?) or
-               (target_type=? and target_id=? and content=?)`,
-		PermTargetGroup, groupId, content,
-		PermTargetApp, appId, content); err == nil {
+         where ((target_type=? and target_id in (?)) or
+               (target_type=? and target_id=?)) and
+			   perm_type=? and content=?`+extra,
+		PermTargetGroup, dbutil.NumList(groupIds),
+		PermTargetApp, appId,
+		typ, content); err == nil {
 		return count > 0, nil
 	} else {
 		return false, err
 	}
 }
 
-func HasAnyLikePerm(db *sql.DB, groupId, appId int64, contentLike string) (bool, error) {
+func HasAnyPrefixPerm(db *sql.DB, typ int, appId int64, groupIds []int64, needWrite bool, content string) (bool, error) {
+	var extra string
+	if needWrite {
+		extra = ` and can_write=true`
+	}
 	var count int64
 	if err := dbutil.Query(db, &count,
 		`select count(*) from perms
-         where (target_type=? and target_id=? and content like ?) or
-               (target_type=? and target_id=? and content like ?)`,
-		PermTargetGroup, groupId, contentLike,
-		PermTargetApp, appId, contentLike); err == nil {
+         where ((target_type=? and target_id in (?)) or
+               (target_type=? and target_id=?)) and
+			   perm_type=? and
+			   ? like CONCAT(content, "%")`+extra,
+		PermTargetGroup, dbutil.NumList(groupIds),
+		PermTargetApp, appId,
+		typ, content); err == nil {
 		return count > 0, nil
 	} else {
 		return false, err

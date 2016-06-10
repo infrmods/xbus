@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
 	"fmt"
@@ -12,7 +13,7 @@ import (
 	"math/big"
 )
 
-var SERIAL_CONFIG_ITEM = "serial_number"
+var SERIAL_CONFIG_ITEM = "cert_serial"
 
 type DBSerialGenerator struct {
 	db *sql.DB
@@ -41,34 +42,30 @@ func (g *DBSerialGenerator) Generate() (*big.Int, error) {
 }
 
 type Config struct {
-	DB struct {
-		Driver string
-		Source string
-	}
 	Cert         CertsConfig
 	RSABits      int    `default:"2048"`
 	Organization string `default:"XBus"`
 }
 
 type AppCtrl struct {
-	config *Config
-	db     *sql.DB
-	certs  *CertsCtrl
+	config       *Config
+	db           *sql.DB
+	CertsManager *CertsCtrl
 }
 
-func NewAppCtrl(config *Config) (*AppCtrl, error) {
-	db, err := sql.Open(config.DB.Driver, config.DB.Source)
-	if err != nil {
-		return nil, fmt.Errorf("open db fail: %v", err)
-	}
+func NewAppCtrl(config *Config, db *sql.DB) (*AppCtrl, error) {
 	certs, err := NewCertsCtrl(&config.Cert, &DBSerialGenerator{db})
 	if err != nil {
 		return nil, err
 	}
-	return &AppCtrl{config: config, db: db, certs: certs}, nil
+	return &AppCtrl{config: config, db: db, CertsManager: certs}, nil
 }
 
-func (ctrl *AppCtrl) New(app *App, pk crypto.PublicKey, dnsNames []string, days int) (privKey crypto.Signer, err error) {
+func (ctrl *AppCtrl) GetAppCertPool() *x509.CertPool {
+	return ctrl.CertsManager.CertPool()
+}
+
+func (ctrl *AppCtrl) NewApp(app *App, pk crypto.PublicKey, dnsNames []string, days int) (privKey crypto.Signer, err error) {
 	if pk == nil {
 		privKey, err = rsa.GenerateKey(rand.Reader, ctrl.config.RSABits)
 		if err != nil {
@@ -79,7 +76,7 @@ func (ctrl *AppCtrl) New(app *App, pk crypto.PublicKey, dnsNames []string, days 
 
 	name := pkix.Name{CommonName: app.Name,
 		Organization: []string{ctrl.config.Organization}}
-	if certPem, err := ctrl.certs.NewCert(pk, name, dnsNames, days); err == nil {
+	if certPem, err := ctrl.CertsManager.NewCert(pk, name, dnsNames, days); err == nil {
 		app.Cert = string(certPem)
 	} else {
 		return nil, err
@@ -131,10 +128,10 @@ func (ctrl *AppCtrl) NewAppPerm(appId int64, content string) (int64, error) {
 	}
 }
 
-func (ctrl *AppCtrl) HasAnyPerm(groupId, appId int64, content string) (bool, error) {
-	return HasAnyPerm(ctrl.db, groupId, appId, content)
+func (ctrl *AppCtrl) HasAnyPerm(typ int, appId int64, groupIds []int64, needWrite bool, content string) (bool, error) {
+	return HasAnyPerm(ctrl.db, typ, appId, groupIds, needWrite, content)
 }
 
-func (ctrl *AppCtrl) HasAnyLikePerm(groupId, appId int64, contentLike string) (bool, error) {
-	return HasAnyLikePerm(ctrl.db, groupId, appId, contentLike)
+func (ctrl *AppCtrl) HasAnyPrefixPerm(typ int, appId int64, groupIds []int64, needWrite bool, content string) (bool, error) {
+	return HasAnyPrefixPerm(ctrl.db, typ, appId, groupIds, needWrite, content)
 }
