@@ -101,7 +101,7 @@ CREATE TABLE `perms` (
   `content` varchar(128) NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `target_key` (`perm_type`,`target_type`,`target_id`)
+  UNIQUE KEY `target_uniq` (`perm_type`,`target_type`,`target_id`,`content`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -114,4 +114,4 @@ CREATE TABLE `perms` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-06-10 22:23:51
+-- Dump completed on 2016-06-11 19:51:28
