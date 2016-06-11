@@ -7,6 +7,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"github.com/golang/glog"
+	"github.com/infrmods/xbus/utils"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -103,7 +105,7 @@ func (mgr *CertsCtrl) NewCert(pubkey crypto.PublicKey, subject pkix.Name,
 	dnsNames []string, days int) ([]byte, error) {
 	serialNumber, err := mgr.serialGenerator.Generate()
 	if err != nil {
-		return nil, fmt.Errorf("generate serial number fail: %v", err)
+		return nil, err
 	}
 
 	template := x509.Certificate{
@@ -122,6 +124,7 @@ func (mgr *CertsCtrl) NewCert(pubkey crypto.PublicKey, subject pkix.Name,
 		pubkey, mgr.rootKey); err == nil {
 		return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: data}), nil
 	} else {
-		return nil, fmt.Errorf("create cert fail: %v", err)
+		glog.Errorf("create cert fail: %v", err)
+		return nil, utils.NewSystemError("create cert fail")
 	}
 }

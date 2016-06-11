@@ -22,7 +22,7 @@ func (desc *ServiceDesc) Marshal() ([]byte, error) {
 		return data, nil
 	} else {
 		glog.Errorf("marshal service-desc(%#v) fail: %v", desc, err)
-		return nil, utils.NewError(utils.EcodeSystemError, "marshal service-desc fail")
+		return nil, utils.NewSystemError("marshal service-desc fail")
 	}
 }
 
@@ -36,7 +36,7 @@ func (endpoint *ServiceEndpoint) Marshal() ([]byte, error) {
 		return data, nil
 	} else {
 		glog.Errorf("marshal endpoint(%#v) fail: %v", endpoint, err)
-		return nil, utils.NewError(utils.EcodeSystemError, "marshal endpoint fail")
+		return nil, utils.NewSystemError("marshal endpoint fail")
 	}
 }
 
@@ -98,7 +98,7 @@ func (ctrl *ServiceCtrl) Unplug(ctx context.Context, name, version, addr string)
 	}
 	if _, err := ctrl.etcdClient.Delete(ctx, ctrl.serviceKey(name, version, addr)); err != nil {
 		glog.Errorf("delete key(%s) fail: %v", ctrl.serviceKey(name, version, addr), err)
-		return utils.NewError(utils.EcodeSystemError, "delete key fail")
+		return utils.NewSystemError("delete key fail")
 	}
 	return nil
 }

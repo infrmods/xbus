@@ -23,7 +23,7 @@ func (ctrl *ServiceCtrl) makeService(kvs []*mvccpb.KeyValue) (*Service, error) {
 		} else if strings.HasPrefix(key, serviceDescNodeKey) {
 			if err := json.Unmarshal(kv.Value, &service.Desc); err != nil {
 				glog.Errorf("invalid desc(%s), unmarshal fail: %v", key, string(kv.Value))
-				return nil, utils.NewError(utils.EcodeSystemError, "service-data damanged")
+				return nil, utils.NewSystemError("service-data damanged")
 			}
 		}
 	}

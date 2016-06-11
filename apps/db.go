@@ -39,7 +39,7 @@ func (app *App) Certificate() (*x509.Certificate, error) {
 
 func InsertApp(db *sql.DB, app *App) error {
 	if id, err := dbutil.Insert(db,
-		`insert into apps(status, name, description, cert)
+		`insert ignore into apps(status, name, description, cert)
          values(?, ?, ?, ?)`, app.Status, app.Name, app.Description, app.Cert); err == nil {
 		app.Id = id
 		return nil

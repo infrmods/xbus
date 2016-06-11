@@ -143,5 +143,5 @@ func (ctrl *ConfigCtrl) Watch(ctx context.Context, name string, revision int64) 
 			return nil, 0, utils.NewError(utils.EcodeDeleted, "")
 		}
 	}
-	return nil, 0, utils.NewError(utils.EcodeSystemError, "unexpected event")
+	return nil, 0, utils.NewSystemError("unexpected event")
 }

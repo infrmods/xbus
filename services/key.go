@@ -80,7 +80,7 @@ func (ctrl *ServiceCtrl) ensureServiceDesc(ctx context.Context, name, version, v
 				}
 			}
 			glog.Errorf("ensureServiceDesc fail, get invalid response: %v", resp)
-			return utils.NewError(utils.EcodeSystemError, "unexpected old service-desc")
+			return utils.NewSystemError("unexpected old service-desc")
 		} else {
 			return utils.CleanErr(err, "put service-desc fail", "exec service-desc check txn fail: %v", err)
 		}
