@@ -9,6 +9,7 @@ import (
 type Response struct {
 	Ok     bool        `json:"ok"`
 	Result interface{} `json:"result,omitempty"`
+	Error  interface{} `json:"error,omitempty"`
 }
 
 var Ok = Response{Ok: true}
@@ -28,11 +29,11 @@ func JsonError(c echo.Context, err error) error {
 			code = http.StatusServiceUnavailable
 		}
 	}
-	return c.JSON(code, Response{Ok: false, Result: err})
+	return c.JSON(code, Response{Ok: false, Error: err})
 }
 
 func JsonErrorC(c echo.Context, code int, err error) error {
-	return c.JSON(code, Response{Ok: false, Result: err})
+	return c.JSON(code, Response{Ok: false, Error: err})
 }
 
 func JsonErrorf(c echo.Context, errCode string, format string, args ...interface{}) error {

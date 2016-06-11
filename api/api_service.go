@@ -2,8 +2,8 @@ package api
 
 import (
 	"github.com/coreos/etcd/clientv3"
-	"github.com/infrmods/xbus/utils"
 	"github.com/infrmods/xbus/services"
+	"github.com/infrmods/xbus/utils"
 	"github.com/labstack/echo"
 	"golang.org/x/net/context"
 	"time"
@@ -15,7 +15,7 @@ const (
 	DefaultWatchTimeout = 60 // in seconds
 )
 
-type PlugResult struct {
+type ServicePlugResult struct {
 	KeepId int64 `json:"keep_id"`
 }
 
@@ -38,7 +38,7 @@ func (server *APIServer) PulgService(c echo.Context) error {
 
 	if kid, err := server.services.Plug(context.Background(),
 		c.P(0), c.P(1), time.Duration(ttl)*time.Second, &desc, &endpoint); err == nil {
-		return JsonResult(c, PlugResult{KeepId: int64(kid)})
+		return JsonResult(c, ServicePlugResult{KeepId: int64(kid)})
 	} else {
 		return JsonError(c, err)
 	}
@@ -75,7 +75,7 @@ func (server *APIServer) UpdateService(c echo.Context) error {
 	return JsonOk(c)
 }
 
-type QueryResult struct {
+type ServiceQueryResult struct {
 	Service  *services.Service `json:"service"`
 	Revision int64             `json:"revision"`
 }
@@ -86,7 +86,7 @@ func (server *APIServer) QueryService(c echo.Context) error {
 	}
 	if service, rev, err := server.services.Query(context.Background(),
 		c.P(0), c.P(1)); err == nil {
-		return JsonResult(c, QueryResult{Service: service, Revision: rev})
+		return JsonResult(c, ServiceQueryResult{Service: service, Revision: rev})
 	} else {
 		return JsonError(c, err)
 	}
@@ -110,7 +110,7 @@ func (server *APIServer) WatchService(c echo.Context) error {
 
 	if service, rev, err := server.services.Watch(ctx,
 		c.P(0), c.P(1), revision); err == nil {
-		return JsonResult(c, QueryResult{Service: service, Revision: rev})
+		return JsonResult(c, ServiceQueryResult{Service: service, Revision: rev})
 	} else {
 		return JsonError(c, err)
 	}

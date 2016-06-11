@@ -34,7 +34,7 @@ func (server *APIServer) RangeConfigs(c echo.Context) error {
 	}
 }
 
-type GetResult struct {
+type ConfigQueryResult struct {
 	Config   *configs.ConfigItem `json:"config"`
 	Revision int64               `json:"revision"`
 }
@@ -45,13 +45,13 @@ func (server *APIServer) GetConfig(c echo.Context) error {
 	}
 
 	if cfg, rev, err := server.configs.Get(context.Background(), c.P(0)); err == nil {
-		return JsonResult(c, GetResult{Config: cfg, Revision: rev})
+		return JsonResult(c, ConfigQueryResult{Config: cfg, Revision: rev})
 	} else {
 		return JsonError(c, err)
 	}
 }
 
-type PutResult struct {
+type ConfigPutResult struct {
 	Revision int64 `json:"revision"`
 }
 
@@ -66,19 +66,14 @@ func (server *APIServer) PutConfig(c echo.Context) error {
 	}
 
 	if rev, err := server.configs.Put(context.Background(), c.P(0), value, version); err == nil {
-		return JsonResult(c, PutResult{Revision: rev})
+		return JsonResult(c, ConfigPutResult{Revision: rev})
 	} else {
 		return JsonError(c, err)
 	}
 }
 
-type WatchResult struct {
-	Config   *configs.ConfigItem `json:"config"`
-	Revision int64               `json:"revision"`
-}
-
 func (server *APIServer) Watch(c echo.Context) error {
-	revision, ok, err := IntFormParamD(c, "version", 0)
+	revision, ok, err := IntQueryParamD(c, "version", 0)
 	if !ok {
 		return err
 	}
@@ -94,7 +89,7 @@ func (server *APIServer) Watch(c echo.Context) error {
 	defer cancelFunc()
 
 	if cfg, rev, err := server.configs.Watch(ctx, c.P(0), revision); err == nil {
-		return JsonResult(c, WatchResult{Config: cfg, Revision: rev})
+		return JsonResult(c, ConfigQueryResult{Config: cfg, Revision: rev})
 	} else {
 		return JsonError(c, err)
 	}

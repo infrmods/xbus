@@ -12,9 +12,9 @@ import (
 )
 
 type ServiceDesc struct {
-	Type  string `json:"type"`
-	Proto string `json:"proto,omitempty"`
-	Desc  string `json:"desc,omitempty"`
+	Type        string `json:"type"`
+	Proto       string `json:"proto,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 func (desc *ServiceDesc) Marshal() ([]byte, error) {
@@ -41,7 +41,8 @@ func (endpoint *ServiceEndpoint) Marshal() ([]byte, error) {
 }
 
 type Service struct {
-	Desc      ServiceDesc       `json:"desc"`
+	ServiceDesc
+
 	Endpoints []ServiceEndpoint `json:"endpoints"`
 }
 
