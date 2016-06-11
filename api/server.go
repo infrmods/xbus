@@ -178,6 +178,5 @@ func (server *APIServer) registerConfigAPIs(g *echo.Group) {
 }
 
 func (server *APIServer) registerAppAPIs(g *echo.Group) {
-	g.Get("/:name/cert", echo.HandlerFunc(server.GetAppCert),
-		server.newPermChecker(apps.PermTypeApp, false))
+	g.Get("/:name/cert", echo.HandlerFunc(server.GetAppCert))
 }

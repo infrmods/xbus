@@ -139,12 +139,12 @@ func GetGroupMembers(db *sql.DB, groupId int64) (apps []App, err error) {
 }
 
 const (
-	PermTypeConfig  = 1
-	PermTypeService = 2
-	PermTypeApp     = 3
+	PermTypeConfig  = 0
+	PermTypeService = 1
+	PermTypeApp     = 2
 
+	PermTargetApp   = 0
 	PermTargetGroup = 1
-	PermTargetApp   = 2
 
 	PermPublicTargetId = 0
 )
@@ -180,41 +180,33 @@ func InsertPerm(db *sql.DB, perm *Perm) error {
 	}
 }
 
-func HasAnyPerm(db *sql.DB, typ int, appId int64, groupIds []int64, needWrite bool, content string) (bool, error) {
+func HasAnyPrefixPerm(db *sql.DB, permType int, appId int64, groupIds []int64, needWrite bool, content string) (bool, error) {
 	var extra string
 	if needWrite {
 		extra = ` and can_write=true`
 	}
 	var count int64
-	if err := dbutil.Query(db, &count,
-		`select count(*) from perms
-         where ((target_type=? and target_id in (?)) or
-                (target_type=? and target_id=?)) and
-               perm_type=? and content=?`+extra,
-		PermTargetGroup, dbutil.NumList(groupIds),
-		PermTargetApp, appId,
-		typ, content); err == nil {
-		return count > 0, nil
+	var err error
+	if appId == PermPublicTargetId {
+		err = dbutil.Query(db, &count,
+			`select count(*) from perms
+             where target_type=? and target_id=? and
+                   perm_type=? and ? like CONCAT(content, "%")`+extra,
+			PermTargetApp, PermPublicTargetId,
+			permType, content)
 	} else {
-		return false, err
+		err = dbutil.Query(db, &count,
+			`select count(*) from perms
+             where ((target_type=? and target_id in (?)) or
+                    (target_type=? and target_id=?) or
+                    target_id=?) and
+                   perm_type=? and ? like CONCAT(content, "%")`+extra,
+			PermTargetGroup, dbutil.NumList(groupIds),
+			PermTargetApp, appId,
+			PermPublicTargetId,
+			permType, content)
 	}
-}
-
-func HasAnyPrefixPerm(db *sql.DB, typ int, appId int64, groupIds []int64, needWrite bool, content string) (bool, error) {
-	var extra string
-	if needWrite {
-		extra = ` and can_write=true`
-	}
-	var count int64
-	if err := dbutil.Query(db, &count,
-		`select count(*) from perms
-         where ((target_type=? and target_id in (?)) or
-                (target_type=? and target_id=?)) and
-               perm_type=? and
-               ? like CONCAT(content, "%")`+extra,
-		PermTargetGroup, dbutil.NumList(groupIds),
-		PermTargetApp, appId,
-		typ, content); err == nil {
+	if err == nil {
 		return count > 0, nil
 	} else {
 		return false, err

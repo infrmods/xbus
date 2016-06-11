@@ -176,16 +176,6 @@ func (ctrl *AppCtrl) NewAppPerm(permType int, appId int64, canWrite bool, conten
 	}
 }
 
-func (ctrl *AppCtrl) HasAnyPerm(typ int, appId int64, groupIds []int64, needWrite bool, content string) (bool, error) {
-	if has, err := HasAnyPerm(ctrl.db, typ, appId, groupIds, needWrite, content); err == nil {
-		return has, nil
-	} else {
-		glog.Errorf("get hasAnyPerm(type:%d, app:%d, groups:%v, needWrite:%v, content:%v) fail: %v",
-			typ, appId, groupIds, needWrite, content, err)
-		return false, utils.NewSystemError("get perm fail")
-	}
-}
-
 func (ctrl *AppCtrl) HasAnyPrefixPerm(typ int, appId int64, groupIds []int64, needWrite bool, content string) (bool, error) {
 	if has, err := HasAnyPrefixPerm(ctrl.db, typ, appId, groupIds, needWrite, content); err == nil {
 		return has, nil
