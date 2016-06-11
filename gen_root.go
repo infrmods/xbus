@@ -1,0 +1,91 @@
+package main
+
+import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"flag"
+	"github.com/golang/glog"
+	"github.com/google/subcommands"
+	"github.com/infrmods/xbus/utils"
+	"golang.org/x/net/context"
+	"math/big"
+	"time"
+)
+
+type GenRootCmd struct {
+	Organization string
+	CommonName   string
+	RSABits      int
+	Days         int
+
+	CertFile string
+	KeyFile  string
+}
+
+func (cmd *GenRootCmd) Name() string {
+	return "gen-root"
+}
+
+func (cmd *GenRootCmd) Synopsis() string {
+	return "generate root cert/key"
+}
+
+func (cmd *GenRootCmd) Usage() string {
+	return ""
+}
+
+func (cmd *GenRootCmd) SetFlags(f *flag.FlagSet) {
+	f.StringVar(&cmd.Organization, "org", "XBus", "organization name")
+	f.StringVar(&cmd.CommonName, "cn", "XBus CA", "common name")
+	f.IntVar(&cmd.RSABits, "rsa-bits", 2048, "rsa key size in bits")
+	f.IntVar(&cmd.Days, "days", 10*365, "cert valid for days")
+	f.StringVar(&cmd.CertFile, "cert-out", "rootcert.pem", "cert output file")
+	f.StringVar(&cmd.KeyFile, "key-out", "rootkey.pem", "key output file")
+}
+
+func (cmd *GenRootCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface{}) subcommands.ExitStatus {
+	privKey, err := rsa.GenerateKey(rand.Reader, cmd.RSABits)
+	if err != nil {
+		glog.Errorf("generate rsa private key fail: %v", err)
+		return subcommands.ExitFailure
+	}
+
+	if cmd.Days < 1 {
+		glog.Errorf("invalid days: %d", cmd.Days)
+		return subcommands.ExitFailure
+	}
+
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization: []string{cmd.Organization},
+			CommonName:   cmd.CommonName,
+		},
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(time.Duration(cmd.Days) * time.Hour * 24),
+		KeyUsage:  x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+
+		BasicConstraintsValid: true,
+		IsCA: true,
+	}
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template,
+		&privKey.PublicKey, privKey)
+	if err != nil {
+		glog.Errorf("create cert fail: %v", err)
+		return subcommands.ExitFailure
+	}
+
+	if err := utils.WriteCert(cmd.CertFile, 0644, derBytes); err != nil {
+		glog.Errorf("write cert fail: %v", err)
+		return subcommands.ExitFailure
+	}
+
+	if err := utils.WritePrivateKey(cmd.KeyFile, 0600, privKey); err != nil {
+		glog.Errorf("write key fail: %v", err)
+		return subcommands.ExitFailure
+	}
+
+	return subcommands.ExitSuccess
+}

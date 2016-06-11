@@ -111,6 +111,12 @@
 			"revisionTime": "2016-04-25T21:53:00Z"
 		},
 		{
+			"checksumSHA1": "a7OfuXCU8P3aQsmTpgZhtQX6OVc=",
+			"path": "github.com/google/subcommands",
+			"revision": "1c7173745a6001f67d8d96ab4e178284c77f7759",
+			"revisionTime": "2016-03-09T19:00:48Z"
+		},
+		{
 			"checksumSHA1": "bTJ9NGkHMA/14FOaLST4UQUeEV8=",
 			"path": "github.com/labstack/echo",
 			"revision": "3946a1839c7c7003936cb36f1abcb85042047d6f",
