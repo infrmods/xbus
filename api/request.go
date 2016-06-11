@@ -18,7 +18,7 @@ func intParam(c echo.Context, name, value string) (int64, bool, error) {
 }
 
 func IntQueryParam(c echo.Context, name string) (int64, bool, error) {
-	val := c.Query(name)
+	val := c.QueryParam(name)
 	if val == "" {
 		return 0, false, c.JSON(http.StatusBadRequest,
 			utils.Errorf(utils.EcodeMissingParam, "missing %s", name))
@@ -27,7 +27,7 @@ func IntQueryParam(c echo.Context, name string) (int64, bool, error) {
 }
 
 func IntQueryParamD(c echo.Context, name string, defval int64) (int64, bool, error) {
-	val := c.Query(name)
+	val := c.QueryParam(name)
 	if val == "" {
 		return defval, true, nil
 	}
@@ -35,7 +35,7 @@ func IntQueryParamD(c echo.Context, name string, defval int64) (int64, bool, err
 }
 
 func IntFormParam(c echo.Context, name string) (int64, bool, error) {
-	val := c.Form(name)
+	val := c.FormValue(name)
 	if val == "" {
 		return 0, false, c.JSON(http.StatusBadRequest,
 			utils.Errorf(utils.EcodeMissingParam, "missing %s", name))
@@ -44,7 +44,7 @@ func IntFormParam(c echo.Context, name string) (int64, bool, error) {
 }
 
 func IntFormParamD(c echo.Context, name string, defval int64) (int64, bool, error) {
-	val := c.Form(name)
+	val := c.FormValue(name)
 	if val == "" {
 		return defval, true, nil
 	}
@@ -52,7 +52,7 @@ func IntFormParamD(c echo.Context, name string, defval int64) (int64, bool, erro
 }
 
 func JsonFormParam(c echo.Context, name string, v interface{}) (bool, error) {
-	val := c.Form(name)
+	val := c.FormValue(name)
 	if val == "" {
 		return false, c.JSON(http.StatusBadRequest,
 			utils.Errorf(utils.EcodeMissingParam, "missing %s", name))

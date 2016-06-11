@@ -61,7 +61,7 @@ func (server *APIServer) Start() error {
 		if !strings.Contains(addr, ":") {
 			addr += ":https"
 		}
-		std = standard.NewFromTLS(addr, server.config.CertFile, server.config.KeyFile)
+		std = standard.WithTLS(addr, server.config.CertFile, server.config.KeyFile)
 		cert, err := tls.LoadX509KeyPair(server.config.CertFile, server.config.KeyFile)
 		if err != nil {
 			return err
@@ -91,7 +91,7 @@ func (server *APIServer) Start() error {
 	return nil
 }
 
-func (server *APIServer) verifyApp(h echo.Handler) echo.Handler {
+func (server *APIServer) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 	return echo.HandlerFunc(func(c echo.Context) error {
 		req := c.Request().(*standard.Request).Request
 		var app *apps.App
@@ -116,14 +116,14 @@ func (server *APIServer) verifyApp(h echo.Handler) echo.Handler {
 		}
 		c.Set("app", app)
 		c.Set("groupIds", groupIds)
-		return h.Handle(c)
+		return h(c)
 	})
 }
 
 var ErrNotPermitted = utils.NewError(utils.EcodeNotPermitted, "not permitted")
 
-func (server *APIServer) newPermChecker(permType int, needWrite bool) echo.Middleware {
-	return echo.MiddlewareFunc(func(h echo.Handler) echo.Handler {
+func (server *APIServer) newPermChecker(permType int, needWrite bool) echo.MiddlewareFunc {
+	return echo.MiddlewareFunc(func(h echo.HandlerFunc) echo.HandlerFunc {
 		return echo.HandlerFunc(func(c echo.Context) error {
 			name := c.P(0)
 			app := c.Get("app").(*apps.App)
@@ -148,7 +148,7 @@ func (server *APIServer) newPermChecker(permType int, needWrite bool) echo.Middl
 					return JsonError(c, err)
 				}
 			}
-			return h.Handle(c)
+			return h(c)
 		})
 	})
 }

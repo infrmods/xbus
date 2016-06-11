@@ -15,10 +15,10 @@ type RangeResult struct {
 }
 
 func (server *APIServer) RangeConfigs(c echo.Context) error {
-	from := c.Query("from")
-	end := c.Query("end")
+	from := c.QueryParam("from")
+	end := c.QueryParam("end")
 	sortOption := clientv3.SortOption{Target: clientv3.SortByKey}
-	switch c.Query("order") {
+	switch c.QueryParam("order") {
 	case "asc", "":
 		sortOption.Order = clientv3.SortAscend
 	case "desc":
@@ -40,7 +40,7 @@ type GetResult struct {
 }
 
 func (server *APIServer) GetConfig(c echo.Context) error {
-	if c.Query("watch") == "true" {
+	if c.QueryParam("watch") == "true" {
 		return server.Watch(c)
 	}
 
@@ -56,7 +56,7 @@ type PutResult struct {
 }
 
 func (server *APIServer) PutConfig(c echo.Context) error {
-	value := c.Form("value")
+	value := c.FormValue("value")
 	if value == "" {
 		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid value")
 	}
@@ -83,8 +83,8 @@ func (server *APIServer) Watch(c echo.Context) error {
 		return err
 	}
 	var timeout time.Duration
-	if c.Query("timeout") != "" {
-		if timeout, err = time.ParseDuration(c.Query("timeout")); err != nil {
+	if c.QueryParam("timeout") != "" {
+		if timeout, err = time.ParseDuration(c.QueryParam("timeout")); err != nil {
 			return JsonErrorf(c, utils.EcodeInvalidParam, "invalid timeout")
 		}
 	} else {

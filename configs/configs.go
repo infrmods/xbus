@@ -139,7 +139,7 @@ func (ctrl *ConfigCtrl) Watch(ctx context.Context, name string, revision int64) 
 		case mvccpb.PUT:
 			cfg := configFromKv(name, event.Kv)
 			return &cfg, resp.Header.Revision, nil
-		case mvccpb.EXPIRE, mvccpb.DELETE:
+		case mvccpb.DELETE:
 			return nil, 0, utils.NewError(utils.EcodeDeleted, "")
 		}
 	}

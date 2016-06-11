@@ -54,7 +54,7 @@ func (server *APIServer) UnplugService(c echo.Context) error {
 }
 
 func (server *APIServer) UpdateService(c echo.Context) error {
-	if c.Form("endpoint") != "" {
+	if c.FormValue("endpoint") != "" {
 		var endpoint services.ServiceEndpoint
 		if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
 			return err
@@ -81,7 +81,7 @@ type QueryResult struct {
 }
 
 func (server *APIServer) QueryService(c echo.Context) error {
-	if c.Query("watch") == "true" {
+	if c.QueryParam("watch") == "true" {
 		return server.WatchService(c)
 	}
 	if service, rev, err := server.services.Query(context.Background(),
@@ -98,8 +98,8 @@ func (server *APIServer) WatchService(c echo.Context) error {
 		return err
 	}
 	var timeout time.Duration
-	if c.Query("timeout") != "" {
-		if timeout, err = time.ParseDuration(c.Query("timeout")); err != nil {
+	if c.QueryParam("timeout") != "" {
+		if timeout, err = time.ParseDuration(c.QueryParam("timeout")); err != nil {
 			return JsonErrorf(c, utils.EcodeInvalidParam, "invalid timeout")
 		}
 	} else {
