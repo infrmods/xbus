@@ -21,11 +21,29 @@ type DBSerialGenerator struct {
 }
 
 func (g *DBSerialGenerator) Generate() (*big.Int, error) {
-	item, err := GetConfigItem(g.db, SERIAL_CONFIG_ITEM)
-	if err != nil {
-		glog.Errorf("get serial config(%s) fail: %v", SERIAL_CONFIG_ITEM, err)
-		return nil, utils.NewSystemError("generate serial fail")
+	var item *ConfigItem
+	var err error
+	for iter := 0; iter < 2; iter++ {
+		if item, err = GetConfigItem(g.db, SERIAL_CONFIG_ITEM); err == nil {
+			break
+		} else if err == sql.ErrNoRows {
+			item = &ConfigItem{Name: SERIAL_CONFIG_ITEM, Ver: 1}
+			item.SetIntValue(2)
+			if new, err := InsertConfigItem(g.db, item); err != nil {
+				glog.Errorf("insert config item(%#v) fail: %v", *item, err)
+				return nil, utils.NewSystemError("generate serial fail")
+			} else if new {
+				return big.NewInt(2), nil
+			} else if iter == 1 {
+				glog.Errorf("insert config item(%#v) deadloop", *item)
+				return nil, utils.NewSystemError("generate serial fail")
+			}
+		} else {
+			glog.Errorf("get serial config(%s) fail: %v", SERIAL_CONFIG_ITEM, err)
+			return nil, utils.NewSystemError("generate serial fail")
+		}
 	}
+
 	for i := 0; i < 32; i++ {
 		n, err := item.GetIntValue()
 		if err != nil {

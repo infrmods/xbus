@@ -230,6 +230,19 @@ func (m *ConfigItem) SetIntValue(n int64) {
 	m.Value = strconv.FormatInt(n, 10)
 }
 
+func InsertConfigItem(db *sql.DB, item *ConfigItem) (bool, error) {
+	if id, err := dbutil.Insert(db,
+		`insert ignore into config_items(name, value, ver)
+         values(?,?,?)`, item.Name, item.Value, item.Ver); err == nil {
+		item.Id = id
+		return true, nil
+	} else if err == dbutil.ZeroEffected {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
 func GetConfigItem(db *sql.DB, name string) (*ConfigItem, error) {
 	var item ConfigItem
 	if err := dbutil.Query(db, &item,
