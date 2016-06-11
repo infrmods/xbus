@@ -38,14 +38,20 @@ func (cmd *NewAppCmd) SetFlags(f *flag.FlagSet) {
 	f.IntVar(&cmd.RSABits, "rsa-bits", 2048, "RSA key length in bits")
 	f.IntVar(&cmd.Days, "days", 365*8, "cert valid for N days")
 
-	f.StringVar(&cmd.CertFile, "cert-out", "appcert.pem", "cert output path")
-	f.StringVar(&cmd.KeyFile, "key-out", "appkey.pem", "key output path")
+	f.StringVar(&cmd.CertFile, "cert-out", "", "cert output path, default: {name}cert.pem")
+	f.StringVar(&cmd.KeyFile, "key-out", "", "key output path, default: {name}key.pem")
 }
 
 func (cmd *NewAppCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface{}) subcommands.ExitStatus {
 	if cmd.AppName == "" {
 		glog.Errorf("please specify the app name")
 		return subcommands.ExitUsageError
+	}
+	if cmd.CertFile == "" {
+		cmd.CertFile = cmd.AppName + "cert.pem"
+	}
+	if cmd.KeyFile == "" {
+		cmd.KeyFile = cmd.AppName + "key.pem"
 	}
 
 	x := NewXBus()

@@ -20,6 +20,7 @@ const (
 	EcodeDeleted              = "DELETED"
 	EcodeChangedServiceDesc   = "CHANGED_SERVICE_DESC"
 	EcodeNameDuplicated       = "NAME_DUPLICATED"
+	EcodeNotPermitted         = "NOT_PERMITTED"
 )
 
 type Error struct {

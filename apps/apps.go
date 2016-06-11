@@ -108,6 +108,15 @@ func (ctrl *AppCtrl) GetAppByName(name string) (*App, error) {
 	}
 }
 
+func (ctrl *AppCtrl) GetAppGroupByName(name string) (*App, []int64, error) {
+	if app, groupIds, err := GetAppGroupByName(ctrl.db, name); err == nil {
+		return app, groupIds, nil
+	} else {
+		glog.Errorf("get app&group(%s) fail: %v", name, err)
+		return nil, nil, utils.NewSystemError("get app&group fail")
+	}
+}
+
 func (ctrl *AppCtrl) NewGroup(group *Group) error {
 	if err := InsertGroup(ctrl.db, group); err == nil {
 		return nil
@@ -145,9 +154,9 @@ func (ctrl *AppCtrl) GetGroupMembers(groupId int64) ([]App, error) {
 	}
 }
 
-func (ctrl *AppCtrl) NewGroupPerm(groupId int64, content string) (int64, error) {
-	perm := Perm{TargetType: PermTargetGroup,
-		TargetId: groupId, Content: content}
+func (ctrl *AppCtrl) NewGroupPerm(permType int, groupId int64, canWrite bool, content string) (int64, error) {
+	perm := Perm{PermType: permType, TargetType: PermTargetGroup,
+		TargetId: groupId, CanWrite: canWrite, Content: content}
 	if err := InsertPerm(ctrl.db, &perm); err == nil {
 		return perm.Id, nil
 	} else {
@@ -156,9 +165,9 @@ func (ctrl *AppCtrl) NewGroupPerm(groupId int64, content string) (int64, error) 
 	}
 }
 
-func (ctrl *AppCtrl) NewAppPerm(appId int64, content string) (int64, error) {
-	perm := Perm{TargetType: PermTargetApp,
-		TargetId: appId, Content: content}
+func (ctrl *AppCtrl) NewAppPerm(permType int, appId int64, canWrite bool, content string) (int64, error) {
+	perm := Perm{PermType: permType, TargetType: PermTargetApp,
+		TargetId: appId, CanWrite: canWrite, Content: content}
 	if err := InsertPerm(ctrl.db, &perm); err == nil {
 		return perm.Id, nil
 	} else {

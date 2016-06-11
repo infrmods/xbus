@@ -16,12 +16,18 @@ import (
 	"time"
 )
 
+const (
+	ConfigPublicInfix = ".public."
+)
+
 type Config struct {
 	Listen      string        `default:"127.0.0.1:4433"`
 	CertFile    string        `default:"apicert.pem"`
 	KeyFile     string        `default:"apikey.pem"`
 	StopTimeout time.Duration `default:"5s" yaml:"stop_timeout"`
 	KillTimeout time.Duration `default:"20s" yaml:"kill_timeout"`
+
+	PermitPublicServiceQuery bool `default:"true"`
 }
 
 type APIServer struct {
@@ -89,12 +95,13 @@ func (server *APIServer) verifyApp(h echo.Handler) echo.Handler {
 	return echo.HandlerFunc(func(c echo.Context) error {
 		req := c.Request().(*standard.Request).Request
 		var app *apps.App
+		var groupIds []int64
 		if server.tls {
 			if req.TLS != nil && len(req.TLS.PeerCertificates) > 0 {
 				cn := req.TLS.PeerCertificates[0].Subject.CommonName
 				if cn != "" {
 					var err error
-					app, err = server.apps.GetAppByName(cn)
+					app, groupIds, err = server.apps.GetAppGroupByName(cn)
 					if err != nil {
 						glog.Errorf("get app(%s) fail: %v", cn, err)
 						return JsonErrorC(c, http.StatusServiceUnavailable,
@@ -108,23 +115,69 @@ func (server *APIServer) verifyApp(h echo.Handler) echo.Handler {
 			// TODO: http request sign verify
 		}
 		c.Set("app", app)
+		c.Set("groupIds", groupIds)
 		return h.Handle(c)
 	})
 }
 
+var ErrNotPermitted = utils.NewError(utils.EcodeNotPermitted, "not permitted")
+
+func (server *APIServer) newPermChecker(permType int, needWrite bool) echo.Middleware {
+	return echo.MiddlewareFunc(func(h echo.Handler) echo.Handler {
+		return echo.HandlerFunc(func(c echo.Context) error {
+			name := c.P(0)
+			app := c.Get("app").(*apps.App)
+			if app == nil {
+				if needWrite {
+					return JsonError(c, ErrNotPermitted)
+				}
+				if has, err := server.apps.HasAnyPrefixPerm(permType, apps.PermPublicTargetId, nil, needWrite, name); err == nil {
+					if !has {
+						return JsonError(c, ErrNotPermitted)
+					}
+				} else {
+					return JsonError(c, err)
+				}
+			} else if !strings.HasPrefix(name, app.Name+".") {
+				groupIds := c.Get("groupIds").([]int64)
+				if has, err := server.apps.HasAnyPrefixPerm(permType, app.Id, groupIds, needWrite, name); err == nil {
+					if !has {
+						return JsonError(c, ErrNotPermitted)
+					}
+				} else {
+					return JsonError(c, err)
+				}
+			}
+			return h.Handle(c)
+		})
+	})
+}
+
 func (server *APIServer) registerServiceAPIs(g *echo.Group) {
-	g.Post("/:name/:version", echo.HandlerFunc(server.PulgService))
-	g.Delete("/:name/:version/:id", echo.HandlerFunc(server.UnplugService))
-	g.Put("/:name/:version/:id", echo.HandlerFunc(server.UpdateService))
-	g.Get("/:name/:version", echo.HandlerFunc(server.QueryService))
+	g.Post("/:name/:version", echo.HandlerFunc(server.PulgService),
+		server.newPermChecker(apps.PermTypeService, true))
+	g.Delete("/:name/:version/:id", echo.HandlerFunc(server.UnplugService),
+		server.newPermChecker(apps.PermTypeService, true))
+	g.Put("/:name/:version/:id", echo.HandlerFunc(server.UpdateService),
+		server.newPermChecker(apps.PermTypeService, true))
+
+	if server.config.PermitPublicServiceQuery {
+		g.Get("/:name/:version", echo.HandlerFunc(server.QueryService))
+	} else {
+		g.Get("/:name/:version", echo.HandlerFunc(server.QueryService),
+			server.newPermChecker(apps.PermTypeService, false))
+	}
 }
 
 func (server *APIServer) registerConfigAPIs(g *echo.Group) {
-	g.Get("", echo.HandlerFunc(server.RangeConfigs))
-	g.Get("/:name", echo.HandlerFunc(server.GetConfig))
-	g.Put("/:name", echo.HandlerFunc(server.PutConfig))
+	// g.Get("", echo.HandlerFunc(server.RangeConfigs))
+	g.Get("/:name", echo.HandlerFunc(server.GetConfig),
+		server.newPermChecker(apps.PermTypeConfig, false))
+	g.Put("/:name", echo.HandlerFunc(server.PutConfig),
+		server.newPermChecker(apps.PermTypeConfig, true))
 }
 
 func (server *APIServer) registerAppAPIs(g *echo.Group) {
-	g.Get("/:name/cert", echo.HandlerFunc(server.GetAppCert))
+	g.Get("/:name/cert", echo.HandlerFunc(server.GetAppCert),
+		server.newPermChecker(apps.PermTypeApp, false))
 }
