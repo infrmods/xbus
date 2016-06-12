@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"flag"
@@ -17,6 +16,7 @@ import (
 type GenRootCmd struct {
 	Organization string
 	CommonName   string
+	EcdsaCruve   string
 	RSABits      int
 	Days         int
 
@@ -40,13 +40,14 @@ func (cmd *GenRootCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.Organization, "org", "XBus", "organization name")
 	f.StringVar(&cmd.CommonName, "cn", "XBus CA", "common name")
 	f.IntVar(&cmd.RSABits, "rsa-bits", 2048, "rsa key size in bits")
+	f.StringVar(&cmd.EcdsaCruve, "ecdsa-curve", "", "ECDSA curve(P224/P256/P384/P521), empty if use RSA")
 	f.IntVar(&cmd.Days, "days", 10*365, "cert valid for days")
 	f.StringVar(&cmd.CertFile, "cert-out", "rootcert.pem", "cert output file")
 	f.StringVar(&cmd.KeyFile, "key-out", "rootkey.pem", "key output file")
 }
 
 func (cmd *GenRootCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface{}) subcommands.ExitStatus {
-	privKey, err := rsa.GenerateKey(rand.Reader, cmd.RSABits)
+	privKey, err := utils.NewPrivateKey(cmd.EcdsaCruve, cmd.RSABits)
 	if err != nil {
 		glog.Errorf("generate rsa private key fail: %v", err)
 		return subcommands.ExitFailure
@@ -71,7 +72,7 @@ func (cmd *GenRootCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interfac
 		IsCA: true,
 	}
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template,
-		&privKey.PublicKey, privKey)
+		privKey.Public(), privKey)
 	if err != nil {
 		glog.Errorf("create cert fail: %v", err)
 		return subcommands.ExitFailure

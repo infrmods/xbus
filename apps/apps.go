@@ -2,8 +2,6 @@ package apps
 
 import (
 	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
@@ -65,6 +63,7 @@ func (g *DBSerialGenerator) Generate() (*big.Int, error) {
 
 type Config struct {
 	Cert         CertsConfig
+	EcdsaCruve   string
 	RSABits      int    `default:"2048"`
 	Organization string `default:"XBus"`
 }
@@ -89,7 +88,7 @@ func (ctrl *AppCtrl) GetAppCertPool() *x509.CertPool {
 
 func (ctrl *AppCtrl) NewApp(app *App, pk crypto.PublicKey, dnsNames []string, days int) (privKey crypto.Signer, err error) {
 	if pk == nil {
-		privKey, err = rsa.GenerateKey(rand.Reader, ctrl.config.RSABits)
+		privKey, err = utils.NewPrivateKey(ctrl.config.EcdsaCruve, ctrl.config.RSABits)
 		if err != nil {
 			glog.Errorf("generate key fail: %v", err)
 			return nil, utils.NewSystemError("generate key fail")
