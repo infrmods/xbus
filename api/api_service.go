@@ -59,6 +59,11 @@ func (server *APIServer) UpdateService(c echo.Context) error {
 		if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
 			return err
 		}
+		if endpoint.Address == "" {
+			endpoints.Address = c.P(2)
+		} else if endpoint.Address != c.P(2) {
+			return JsonErrorf(c, utils.EcodeInvalidParam, "can't modify address")
+		}
 		if err := server.services.Update(context.Background(), c.P(0), c.P(1), c.P(2), &endpoint); err != nil {
 			return JsonError(c, err)
 		}
