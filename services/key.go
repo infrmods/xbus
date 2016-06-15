@@ -23,7 +23,7 @@ func checkNameVersion(name, version string) error {
 	return nil
 }
 
-var rValidAddress = regexp.MustCompile(`(?i)^[a-z0-9:_-]+$`)
+var rValidAddress = regexp.MustCompile(`(?i)^[a-z0-9:_.-]+$`)
 
 func checkAddress(addr string) error {
 	if !rValidAddress.MatchString(addr) {
