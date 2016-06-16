@@ -60,7 +60,7 @@ func (server *APIServer) UpdateService(c echo.Context) error {
 			return err
 		}
 		if endpoint.Address == "" {
-			endpoints.Address = c.P(2)
+			endpoint.Address = c.P(2)
 		} else if endpoint.Address != c.P(2) {
 			return JsonErrorf(c, utils.EcodeInvalidParam, "can't modify address")
 		}
