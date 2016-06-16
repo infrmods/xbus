@@ -41,9 +41,11 @@ func (endpoint *ServiceEndpoint) Marshal() ([]byte, error) {
 }
 
 type Service struct {
-	ServiceDesc
-
+	Name      string            `json:"name"`
+	Version   string            `json:"version"`
 	Endpoints []ServiceEndpoint `json:"endpoints"`
+
+	ServiceDesc
 }
 
 type Config struct {
@@ -153,13 +155,13 @@ func (ctrl *ServiceCtrl) Query(ctx context.Context, name, version string) (*Serv
 	if err := checkNameVersion(name, version); err != nil {
 		return nil, 0, err
 	}
-	key := ctrl.serviceKeyPrefix(name, version)
-	return ctrl.query(ctx, key)
+	return ctrl.query(ctx, name, version)
 }
 
-func (ctrl *ServiceCtrl) query(ctx context.Context, key string) (*Service, int64, error) {
+func (ctrl *ServiceCtrl) query(ctx context.Context, name, version string) (*Service, int64, error) {
+	key := ctrl.serviceKeyPrefix(name, version)
 	if resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix()); err == nil {
-		if service, err := ctrl.makeService(resp.Kvs); err == nil {
+		if service, err := ctrl.makeService(name, version, resp.Kvs); err == nil {
 			return service, resp.Header.Revision, nil
 		} else {
 			return nil, 0, err
@@ -180,7 +182,7 @@ func (ctrl *ServiceCtrl) Watch(ctx context.Context, name, version string,
 	watchCh := watcher.Watch(ctx, key, clientv3.WithRev(revision), clientv3.WithPrefix())
 	resp := <-watchCh
 	if !resp.Canceled {
-		return ctrl.query(ctx, key)
+		return ctrl.query(ctx, name, version)
 	}
 	return nil, 0, nil
 }

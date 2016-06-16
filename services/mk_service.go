@@ -8,8 +8,11 @@ import (
 	"strings"
 )
 
-func (ctrl *ServiceCtrl) makeService(kvs []*mvccpb.KeyValue) (*Service, error) {
+func (ctrl *ServiceCtrl) makeService(name, version string, kvs []*mvccpb.KeyValue) (*Service, error) {
 	var service Service
+	service.Name = name
+	service.Version = version
+
 	service.Endpoints = make([]ServiceEndpoint, 0, len(kvs))
 	for _, kv := range kvs {
 		parts := strings.Split(string(kv.Key), "/")
