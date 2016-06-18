@@ -16,7 +16,7 @@ const (
 )
 
 type ServicePlugResult struct {
-	KeepId int64 `json:"keep_id"`
+	LeaseID clientv3.LeaseID `json:"lease_id"`
 }
 
 func (server *APIServer) PulgService(c echo.Context) error {
@@ -27,8 +27,45 @@ func (server *APIServer) PulgService(c echo.Context) error {
 	if ttl > 0 && ttl < MinServiceTTL {
 		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
 	}
+	leaseId, ok, err := IntFormParamD(c, "lease_id", 0)
+	if !ok {
+		return err
+	}
+
 	var desc services.ServiceDesc
 	if ok, err := JsonFormParam(c, "desc", &desc); !ok {
+		return err
+	}
+	desc.Name, desc.Version = c.P(0), c.P(1)
+	var endpoint services.ServiceEndpoint
+	if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
+		return err
+	}
+
+	if leaseId, err := server.services.Plug(context.Background(),
+		time.Duration(ttl)*time.Second, clientv3.LeaseID(leaseId),
+		&desc, &endpoint); err == nil {
+		return JsonResult(c, ServicePlugResult{LeaseID: leaseId})
+	} else {
+		return JsonError(c, err)
+	}
+}
+
+func (server *APIServer) PlugAllService(c echo.Context) error {
+	ttl, ok, err := IntFormParamD(c, "ttl", 60)
+	if !ok {
+		return err
+	}
+	if ttl > 0 && ttl < MinServiceTTL {
+		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
+	}
+	leaseId, ok, err := IntFormParamD(c, "lease_id", 0)
+	if !ok {
+		return err
+	}
+
+	var desces []services.ServiceDesc
+	if ok, err := JsonFormParam(c, "desces", &desces); !ok {
 		return err
 	}
 	var endpoint services.ServiceEndpoint
@@ -36,13 +73,13 @@ func (server *APIServer) PulgService(c echo.Context) error {
 		return err
 	}
 
-	if kid, err := server.services.Plug(context.Background(),
-		c.P(0), c.P(1), time.Duration(ttl)*time.Second, &desc, &endpoint); err == nil {
-		return JsonResult(c, ServicePlugResult{KeepId: int64(kid)})
+	if leaseId, err := server.services.PlugAllService(context.Background(),
+		time.Duration(ttl)*time.Second, clientv3.LeaseID(leaseId),
+		desces, &endpoint); err == nil {
+		return JsonResult(c, ServicePlugResult{LeaseID: leaseId})
 	} else {
 		return JsonError(c, err)
 	}
-	return nil
 }
 
 func (server *APIServer) UnplugService(c echo.Context) error {
@@ -54,28 +91,17 @@ func (server *APIServer) UnplugService(c echo.Context) error {
 }
 
 func (server *APIServer) UpdateService(c echo.Context) error {
-	if c.FormValue("endpoint") != "" {
-		var endpoint services.ServiceEndpoint
-		if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
-			return err
-		}
-		if endpoint.Address == "" {
-			endpoint.Address = c.P(2)
-		} else if endpoint.Address != c.P(2) {
-			return JsonErrorf(c, utils.EcodeInvalidParam, "can't modify address")
-		}
-		if err := server.services.Update(context.Background(), c.P(0), c.P(1), c.P(2), &endpoint); err != nil {
-			return JsonError(c, err)
-		}
-	} else {
-		keepId, ok, err := IntFormParam(c, "keep_id")
-		if !ok {
-			return err
-		}
-		if err := server.services.KeepAlive(context.Background(),
-			c.P(0), c.P(1), c.P(2), clientv3.LeaseID(keepId)); err != nil {
-			return JsonError(c, err)
-		}
+	var endpoint services.ServiceEndpoint
+	if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
+		return err
+	}
+	if endpoint.Address == "" {
+		endpoint.Address = c.P(2)
+	} else if endpoint.Address != c.P(2) {
+		return JsonErrorf(c, utils.EcodeInvalidParam, "can't modify address")
+	}
+	if err := server.services.Update(context.Background(), c.P(0), c.P(1), c.P(2), &endpoint); err != nil {
+		return JsonError(c, err)
 	}
 	return JsonOk(c)
 }

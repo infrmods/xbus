@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/tls"
+	"github.com/coreos/etcd/clientv3"
 	"github.com/facebookgo/httpdown"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/apps"
@@ -34,17 +35,19 @@ type APIServer struct {
 	config Config
 	tls    bool
 
-	services *services.ServiceCtrl
-	configs  *configs.ConfigCtrl
-	apps     *apps.AppCtrl
+	etcdClient *clientv3.Client
+	services   *services.ServiceCtrl
+	configs    *configs.ConfigCtrl
+	apps       *apps.AppCtrl
 
 	httpdown.Server
 }
 
-func NewAPIServer(config *Config, servs *services.ServiceCtrl,
-	cfgs *configs.ConfigCtrl, apps *apps.AppCtrl) *APIServer {
+func NewAPIServer(config *Config, etcdClient *clientv3.Client,
+	servs *services.ServiceCtrl, cfgs *configs.ConfigCtrl, apps *apps.AppCtrl) *APIServer {
 	server := &APIServer{config: *config, tls: config.CertFile != "",
-		services: servs, configs: cfgs, apps: apps}
+		etcdClient: etcdClient,
+		services:   servs, configs: cfgs, apps: apps}
 	return server
 }
 
@@ -55,6 +58,7 @@ func (server *APIServer) Start() error {
 	server.registerServiceAPIs(e.Group("/api/services"))
 	server.registerConfigAPIs(e.Group("/api/configs"))
 	server.registerAppAPIs(e.Group("/api/apps"))
+	server.registerAppAPIs(e.Group("/api/leases"))
 	var std *standard.Server
 	addr := server.config.Listen
 	if server.config.CertFile != "" {
@@ -158,6 +162,8 @@ func (server *APIServer) registerServiceAPIs(g *echo.Group) {
 		server.newPermChecker(apps.PermTypeService, true))
 	g.Delete("/:name/:version/:id", echo.HandlerFunc(server.UnplugService),
 		server.newPermChecker(apps.PermTypeService, true))
+	g.Post("", echo.HandlerFunc(server.PlugAllService),
+		server.newPermChecker(apps.PermTypeService, true))
 	g.Put("/:name/:version/:id", echo.HandlerFunc(server.UpdateService),
 		server.newPermChecker(apps.PermTypeService, true))
 
@@ -167,6 +173,11 @@ func (server *APIServer) registerServiceAPIs(g *echo.Group) {
 		g.Get("/:name/:version", echo.HandlerFunc(server.QueryService),
 			server.newPermChecker(apps.PermTypeService, false))
 	}
+}
+
+func (server *APIServer) registerLeaseAPIs(g *echo.Group) {
+	g.Post("/:id", echo.HandlerFunc(server.KeepAliveLease))
+	g.Delete("/:id", echo.HandlerFunc(server.RevokeLease))
 }
 
 func (server *APIServer) registerConfigAPIs(g *echo.Group) {

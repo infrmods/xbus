@@ -88,9 +88,9 @@ func (ctrl *ServiceCtrl) ensureServiceDesc(ctx context.Context, name, version, v
 	return utils.NewError(utils.EcodeTooManyAttempts, "put service-desc fail: too many attempts")
 }
 
-func (ctrl *ServiceCtrl) newServiceNode(ctx context.Context, ttl time.Duration,
-	key, value string) (leaseId clientv3.LeaseID, rerr error) {
-	if ttl > 0 {
+func (ctrl *ServiceCtrl) setServiceNode(ctx context.Context, ttl time.Duration, leaseId clientv3.LeaseID,
+	key, value string) (_ clientv3.LeaseID, rerr error) {
+	if ttl > 0 && leaseId == 0 {
 		if resp, err := ctrl.etcdClient.Lease.Grant(ctx, int64(ttl.Seconds())); err == nil {
 			leaseId = clientv3.LeaseID(resp.ID)
 			defer func() {

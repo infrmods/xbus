@@ -6,12 +6,13 @@ import (
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc/codes"
 	"strings"
 	"time"
 )
 
 type ServiceDesc struct {
+	Name        string `json:"name,omitempty"`
+	Version     string `json:"version,omitempty"`
 	Type        string `json:"type"`
 	Proto       string `json:"proto,omitempty"`
 	Description string `json:"description,omitempty"`
@@ -41,8 +42,6 @@ func (endpoint *ServiceEndpoint) Marshal() ([]byte, error) {
 }
 
 type Service struct {
-	Name      string            `json:"name"`
-	Version   string            `json:"version"`
 	Endpoints []ServiceEndpoint `json:"endpoints"`
 
 	ServiceDesc
@@ -65,13 +64,21 @@ func NewServiceCtrl(config *Config, etcdClient *clientv3.Client) *ServiceCtrl {
 	return services
 }
 
-func (ctrl *ServiceCtrl) Plug(ctx context.Context, name, version string,
-	ttl time.Duration, desc *ServiceDesc, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
-	if err := checkNameVersion(name, version); err != nil {
-		return 0, err
+func checkDesc(desc *ServiceDesc) error {
+	if err := checkNameVersion(desc.Name, desc.Version); err != nil {
+		return err
 	}
 	if desc.Type == "" {
-		return 0, utils.NewError(utils.EcodeInvalidEndpoint, "missing type")
+		return utils.Errorf(utils.EcodeInvalidEndpoint, "%s:%s missing type", desc.Name, desc.Version)
+	}
+	return nil
+}
+
+func (ctrl *ServiceCtrl) Plug(ctx context.Context,
+	ttl time.Duration, leaseId clientv3.LeaseID,
+	desc *ServiceDesc, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
+	if err := checkDesc(desc); err != nil {
+		return 0, err
 	}
 	if endpoint.Address == "" {
 		return 0, utils.NewError(utils.EcodeInvalidEndpoint, "missing address")
@@ -85,11 +92,11 @@ func (ctrl *ServiceCtrl) Plug(ctx context.Context, name, version string,
 	if err != nil {
 		return 0, err
 	}
-	if err := ctrl.ensureServiceDesc(ctx, name, version, string(desc_data)); err != nil {
+	if err := ctrl.ensureServiceDesc(ctx, desc.Name, desc.Version, string(desc_data)); err != nil {
 		return 0, err
 	}
-	return ctrl.newServiceNode(ctx, ttl,
-		ctrl.serviceKey(name, version, endpoint.Address), string(endpoint_data))
+	return ctrl.setServiceNode(ctx, ttl, leaseId,
+		ctrl.serviceKey(desc.Name, desc.Version, endpoint.Address), string(endpoint_data))
 }
 
 func (ctrl *ServiceCtrl) Unplug(ctx context.Context, name, version, addr string) error {
@@ -104,6 +111,50 @@ func (ctrl *ServiceCtrl) Unplug(ctx context.Context, name, version, addr string)
 		return utils.NewSystemError("delete key fail")
 	}
 	return nil
+}
+
+func (ctrl *ServiceCtrl) PlugAllService(ctx context.Context,
+	ttl time.Duration, leaseId clientv3.LeaseID,
+	desces []ServiceDesc, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
+	if endpoint.Address == "" {
+		return 0, utils.NewError(utils.EcodeInvalidEndpoint, "missing address")
+	}
+	if err := checkAddress(endpoint.Address); err != nil {
+		return 0, err
+	}
+	endpoint_data, err := endpoint.Marshal()
+	if err != nil {
+		return 0, err
+	}
+
+	for _, desc := range desces {
+		if err := checkDesc(&desc); err != nil {
+			return 0, err
+		}
+		desc_data, err := desc.Marshal()
+		if err != nil {
+			return 0, err
+		}
+		if err := ctrl.ensureServiceDesc(ctx, desc.Name, desc.Version, string(desc_data)); err != nil {
+			return 0, err
+		}
+	}
+	for _, desc := range desces {
+		if leaseId, err = ctrl.setServiceNode(ctx, ttl, leaseId,
+			ctrl.serviceKey(desc.Name, desc.Version, endpoint.Address),
+			string(endpoint_data)); err != nil {
+			return 0, err
+		}
+	}
+	return leaseId, nil
+}
+
+func (ctrl *ServiceCtrl) UnplugAllService(ctx context.Context, leaseId clientv3.LeaseID) error {
+	if _, err := ctrl.etcdClient.Lease.Revoke(ctx, leaseId); err == nil {
+		return nil
+	} else {
+		return utils.CleanErr(err, "unplug fail", "revoke lease(%v) fail: v", leaseId, err)
+	}
 }
 
 func (ctrl *ServiceCtrl) Update(ctx context.Context, name, version, addr string, endpoint *ServiceEndpoint) error {
@@ -132,23 +183,6 @@ func (ctrl *ServiceCtrl) Update(ctx context.Context, name, version, addr string,
 	} else {
 		return utils.CleanErr(err, "update fail", "tnx update(%s) fail: %v", key, err)
 	}
-}
-
-func (ctrl *ServiceCtrl) KeepAlive(ctx context.Context, name, version, addr string, keepId clientv3.LeaseID) error {
-	if err := checkNameVersion(name, version); err != nil {
-		return err
-	}
-	if err := checkAddress(addr); err != nil {
-		return err
-	}
-	if _, err := ctrl.etcdClient.Lease.KeepAliveOnce(ctx, keepId); err != nil {
-		code, err := utils.CleanErrWithCode(err, "keepalive fail", "KeepAliveOnce(%d) fail: %#v", keepId, err)
-		if code == codes.NotFound {
-			return utils.NewError(utils.EcodeNotFound, "keepId not found")
-		}
-		return err
-	}
-	return nil
 }
 
 func (ctrl *ServiceCtrl) Query(ctx context.Context, name, version string) (*Service, int64, error) {

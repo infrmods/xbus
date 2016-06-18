@@ -34,7 +34,7 @@ func (cmd RunCommand) Execute(_ context.Context, f *flag.FlagSet, _ ...interface
 	etcdClient := x.NewEtcdClient()
 	services := services.NewServiceCtrl(&x.Config.Services, etcdClient)
 	configs := configs.NewConfigCtrl(&x.Config.Configs, etcdClient)
-	apiServer := api.NewAPIServer(&x.Config.Api, services, configs, x.NewAppCtrl())
+	apiServer := api.NewAPIServer(&x.Config.Api, etcdClient, services, configs, x.NewAppCtrl())
 	if err := apiServer.Start(); err != nil {
 		glog.Errorf("start api_sersver fail: %v", err)
 		os.Exit(-1)
