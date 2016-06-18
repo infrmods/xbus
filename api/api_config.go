@@ -77,15 +77,11 @@ func (server *APIServer) Watch(c echo.Context) error {
 	if !ok {
 		return err
 	}
-	var timeout time.Duration
-	if c.QueryParam("timeout") != "" {
-		if timeout, err = time.ParseDuration(c.QueryParam("timeout")); err != nil {
-			return JsonErrorf(c, utils.EcodeInvalidParam, "invalid timeout")
-		}
-	} else {
-		timeout = DefaultWatchTimeout * time.Second
+	timeout, ok, err := IntQueryParamD(c, "timeout", DefaultWatchTimeout)
+	if !ok {
+		return err
 	}
-	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancelFunc()
 
 	if cfg, rev, err := server.configs.Watch(ctx, c.P(0), revision); err == nil {
