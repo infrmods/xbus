@@ -192,6 +192,22 @@ func (ctrl *ServiceCtrl) Query(ctx context.Context, name, version string) (*Serv
 	return ctrl.query(ctx, name, version)
 }
 
+func (ctrl *ServiceCtrl) QueryAllVersions(ctx context.Context, name string) (map[string]*Service, int64, error) {
+	if err := checkName(name); err != nil {
+		return nil, 0, err
+	}
+	key := ctrl.serviceEntryPrefix(name)
+	if resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix()); err == nil {
+		if services, err := ctrl.makeAllService(name, resp.Kvs); err == nil {
+			return services, resp.Header.Revision, nil
+		} else {
+			return nil, 0, err
+		}
+	} else {
+		return nil, 0, utils.CleanErr(err, "query fail", "QueryAll(%s) fail: %v", key, err)
+	}
+}
+
 func (ctrl *ServiceCtrl) query(ctx context.Context, name, version string) (*Service, int64, error) {
 	key := ctrl.serviceKeyPrefix(name, version)
 	if resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix()); err == nil {

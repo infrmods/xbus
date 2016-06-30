@@ -13,6 +13,13 @@ import (
 var rValidName = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]{5,}$`)
 var rValidVersion = regexp.MustCompile(`(?i)^[a-z0-9][a-z0-9_.-]*$`)
 
+func checkName(name string) error {
+	if !rValidName.MatchString(name) {
+		return utils.NewError(utils.EcodeInvalidName, "")
+	}
+	return nil
+}
+
 func checkNameVersion(name, version string) error {
 	if !rValidName.MatchString(name) {
 		return utils.NewError(utils.EcodeInvalidName, "")
@@ -30,6 +37,10 @@ func checkAddress(addr string) error {
 		return utils.NewError(utils.EcodeInvalidAddress, "")
 	}
 	return nil
+}
+
+func (ctrl *ServiceCtrl) serviceEntryPrefix(name string) string {
+	return fmt.Sprintf("%s/%s/", ctrl.config.KeyPrefix, name)
 }
 
 func (ctrl *ServiceCtrl) serviceKeyPrefix(name, version string) string {

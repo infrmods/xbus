@@ -73,8 +73,8 @@ func (x *XBus) NewEtcdClient() *clientv3.Client {
 	return etcdClient
 }
 
-func (x *XBus) NewAppCtrl() *apps.AppCtrl {
-	appCtrl, err := apps.NewAppCtrl(&x.Config.Apps, x.NewDB())
+func (x *XBus) NewAppCtrl(db *sql.DB) *apps.AppCtrl {
+	appCtrl, err := apps.NewAppCtrl(&x.Config.Apps, db)
 	if err != nil {
 		glog.Errorf("create appsCtrl fail: %v", err)
 		os.Exit(-1)

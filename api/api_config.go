@@ -44,7 +44,7 @@ func (server *APIServer) GetConfig(c echo.Context) error {
 		return server.Watch(c)
 	}
 
-	if cfg, rev, err := server.configs.Get(context.Background(), c.P(0)); err == nil {
+	if cfg, rev, err := server.configs.Get(context.Background(), server.appId(c), c.P(0)); err == nil {
 		return JsonResult(c, ConfigQueryResult{Config: cfg, Revision: rev})
 	} else {
 		return JsonError(c, err)
@@ -84,7 +84,7 @@ func (server *APIServer) Watch(c echo.Context) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancelFunc()
 
-	if cfg, rev, err := server.configs.Watch(ctx, c.P(0), revision); err == nil {
+	if cfg, rev, err := server.configs.Watch(ctx, server.appId(c), c.P(0), revision); err == nil {
 		return JsonResult(c, ConfigQueryResult{Config: cfg, Revision: rev})
 	} else {
 		return JsonError(c, err)

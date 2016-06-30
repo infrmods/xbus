@@ -123,6 +123,19 @@ func (server *APIServer) QueryService(c echo.Context) error {
 	}
 }
 
+type AllServiceQueryResult struct {
+	Services map[string]*services.Service `json:"services"`
+	Revision int64                        `json:"revision"`
+}
+
+func (server *APIServer) QueryServiceAllVersions(c echo.Context) error {
+	if services, rev, err := server.services.QueryAllVersions(context.Background(), c.P(0)); err == nil {
+		return JsonResult(c, AllServiceQueryResult{Services: services, Revision: rev})
+	} else {
+		return JsonError(c, err)
+	}
+}
+
 func (server *APIServer) WatchService(c echo.Context) error {
 	revision, ok, err := IntQueryParam(c, "revision")
 	if !ok {

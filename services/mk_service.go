@@ -33,3 +33,25 @@ func (ctrl *ServiceCtrl) makeService(name, version string, kvs []*mvccpb.KeyValu
 	}
 	return &service, nil
 }
+
+func (ctrl *ServiceCtrl) makeAllService(name string, kvs []*mvccpb.KeyValue) (map[string]*Service, error) {
+	mkvs := make(map[string][]*mvccpb.KeyValue)
+	for _, kv := range kvs {
+		parts := strings.Split(string(kv.Key), "/")
+		if len(parts) == 1 {
+			continue
+		}
+		version := parts[len(parts)-2]
+		mkvs[version] = append(mkvs[version], kv)
+	}
+
+	services := make(map[string]*Service)
+	for version, subkvs := range mkvs {
+		if service, err := ctrl.makeService(name, version, subkvs); err == nil {
+			services[version] = service
+		} else {
+			return nil, err
+		}
+	}
+	return services, nil
+}

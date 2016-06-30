@@ -31,10 +31,11 @@ func (cmd RunCommand) Usage() string {
 
 func (cmd RunCommand) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	x := NewXBus()
+	db := x.NewDB()
 	etcdClient := x.NewEtcdClient()
 	services := services.NewServiceCtrl(&x.Config.Services, etcdClient)
-	configs := configs.NewConfigCtrl(&x.Config.Configs, etcdClient)
-	apiServer := api.NewAPIServer(&x.Config.Api, etcdClient, services, configs, x.NewAppCtrl())
+	configs := configs.NewConfigCtrl(&x.Config.Configs, db, etcdClient)
+	apiServer := api.NewAPIServer(&x.Config.Api, etcdClient, services, configs, x.NewAppCtrl(db))
 	if err := apiServer.Start(); err != nil {
 		glog.Errorf("start api_sersver fail: %v", err)
 		os.Exit(-1)

@@ -124,6 +124,13 @@ func (server *APIServer) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 	})
 }
 
+func (server *APIServer) appId(c echo.Context) int64 {
+	if x := c.Get("app"); x != nil {
+		return x.(*apps.App).Id
+	}
+	return 0
+}
+
 var ErrNotPermitted = utils.NewError(utils.EcodeNotPermitted, "not permitted")
 
 func (server *APIServer) newPermChecker(permType int, needWrite bool) echo.MiddlewareFunc {
@@ -169,8 +176,11 @@ func (server *APIServer) registerServiceAPIs(g *echo.Group) {
 
 	if server.config.PermitPublicServiceQuery {
 		g.Get("/:name/:version", echo.HandlerFunc(server.QueryService))
+		g.Get("/:name", echo.HandlerFunc(server.QueryServiceAllVersions))
 	} else {
 		g.Get("/:name/:version", echo.HandlerFunc(server.QueryService),
+			server.newPermChecker(apps.PermTypeService, false))
+		g.Get("/:name", echo.HandlerFunc(server.QueryServiceAllVersions),
 			server.newPermChecker(apps.PermTypeService, false))
 	}
 }

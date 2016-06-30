@@ -1,6 +1,7 @@
 package configs
 
 import (
+	"database/sql"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/golang/glog"
@@ -21,11 +22,12 @@ type Config struct {
 
 type ConfigCtrl struct {
 	config     Config
+	db         *sql.DB
 	etcdClient *clientv3.Client
 }
 
-func NewConfigCtrl(config *Config, etcdClient *clientv3.Client) *ConfigCtrl {
-	configs := &ConfigCtrl{config: *config, etcdClient: etcdClient}
+func NewConfigCtrl(config *Config, db *sql.DB, etcdClient *clientv3.Client) *ConfigCtrl {
+	configs := &ConfigCtrl{config: *config, db: db, etcdClient: etcdClient}
 	if strings.HasSuffix(configs.config.KeyPrefix, "/") {
 		configs.config.KeyPrefix = configs.config.KeyPrefix[:len(configs.config.KeyPrefix)-1]
 	}
@@ -67,7 +69,7 @@ func (ctrl *ConfigCtrl) Range(ctx context.Context, from, end string, sortOption 
 	}
 }
 
-func (ctrl *ConfigCtrl) Get(ctx context.Context, name string) (*ConfigItem, int64, error) {
+func (ctrl *ConfigCtrl) Get(ctx context.Context, appId int64, name string) (*ConfigItem, int64, error) {
 	if err := checkName(name); err != nil {
 		return nil, 0, err
 	}
@@ -77,6 +79,9 @@ func (ctrl *ConfigCtrl) Get(ctx context.Context, name string) (*ConfigItem, int6
 			return nil, 0, utils.NewError(utils.EcodeNotFound, "")
 		}
 		cfg := configFromKv(name, resp.Kvs[0])
+		if err := ctrl.changeAppConfigState(appId, name, cfg.Version); err != nil {
+			return nil, 0, err
+		}
 		return &cfg, resp.Header.Revision, nil
 	} else {
 		return nil, 0, utils.CleanErr(err, "", "get config key(%s) fail: %v", name, err)
@@ -108,12 +113,15 @@ func (ctrl *ConfigCtrl) Put(ctx context.Context, name, value string, version int
 		} else if !resp.Succeeded {
 			return 0, utils.NewError(utils.EcodeInvalidVersion, "")
 		} else {
+			if err := ctrl.setDBConfig(name, value); err != nil {
+				return 0, err
+			}
 			return resp.Header.Revision, nil
 		}
 	}
 }
 
-func (ctrl *ConfigCtrl) Watch(ctx context.Context, name string, revision int64) (*ConfigItem, int64, error) {
+func (ctrl *ConfigCtrl) Watch(ctx context.Context, appId int64, name string, revision int64) (*ConfigItem, int64, error) {
 	if err := checkName(name); err != nil {
 		return nil, 0, err
 	}
@@ -138,6 +146,9 @@ func (ctrl *ConfigCtrl) Watch(ctx context.Context, name string, revision int64) 
 		switch event.Type {
 		case mvccpb.PUT:
 			cfg := configFromKv(name, event.Kv)
+			if err := ctrl.changeAppConfigState(appId, name, cfg.Version); err != nil {
+				return nil, 0, err
+			}
 			return &cfg, resp.Header.Revision, nil
 		case mvccpb.DELETE:
 			return nil, 0, utils.NewError(utils.EcodeDeleted, "")
