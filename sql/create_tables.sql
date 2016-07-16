@@ -16,6 +16,27 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `app_config_states`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `app_config_states` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `app_id` bigint(20) NOT NULL,
+  `app_node` varchar(32) DEFAULT NULL,
+  `config_name` varchar(64) NOT NULL,
+  `version` bigint(20) NOT NULL,
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `app_config_uniq` (`config_name`,`app_id`,`app_node`),
+  KEY `app_node_state_key` (`app_id`,`app_node`,`config_name`),
+  KEY `app_config_state_key` (`app_id`,`config_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `apps`
 --
 
@@ -42,7 +63,7 @@ CREATE TABLE `apps` (
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `config_histories` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `name` varchar(32) NOT NULL,
+  `name` varchar(64) NOT NULL,
   `value` text NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -76,7 +97,7 @@ CREATE TABLE `config_items` (
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `configs` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `name` varchar(32) NOT NULL,
+  `name` varchar(64) NOT NULL,
   `value` text NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -147,4 +168,4 @@ CREATE TABLE `perms` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-06-30 23:18:58
+-- Dump completed on 2016-07-16 22:25:25

@@ -1,6 +1,7 @@
 package configs
 
 import (
+	"github.com/gocomm/dbutil"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
 	"time"
@@ -58,24 +59,30 @@ func (ctrl *ConfigCtrl) setDBConfig(name, value string) (rerr error) {
 }
 
 type AppConfigState struct {
-	Id         int64     `json:"id"`
-	AppId      int64     `json:"app_id"`
-	ConfigName string    `json:"config_name"`
-	Version    int64     `json:"version"`
-	CreateTime time.Time `json:"create_time"`
-	ModifyTime time.Time `json:"modify_time"`
+	Id         int64             `json:"id"`
+	AppId      int64             `json:"app_id"`
+	AppNode    dbutil.NullString `json:"app_node"`
+	ConfigName string            `json:"config_name"`
+	Version    int64             `json:"version"`
+	CreateTime time.Time         `json:"create_time"`
+	ModifyTime time.Time         `json:"modify_time"`
 }
 
-func (ctrl *ConfigCtrl) changeAppConfigState(appId int64, configName string, version int64) error {
+func (ctrl *ConfigCtrl) changeAppConfigState(appId int64, appNode, configName string, version int64) error {
 	if appId <= 0 {
 		return nil
 	}
 
-	if _, err := ctrl.db.Exec(`insert into app_config_states(app_id,config_name,version,create_time,modify_time)
-                            values(?,?,?,now(),now())
+	var node dbutil.NullString
+	if appNode != "" {
+		node.String, node.Valid = appNode, true
+	}
+
+	if _, err := ctrl.db.Exec(`insert into app_config_states(app_id,node,config_name,version,create_time,modify_time)
+                            values(?,?,?,?,now(),now())
                             on duplicate key update version=?,modify_time=now()`,
 		appId, configName, version, version); err != nil {
-		glog.Errorf("change app(%d) config(%s) state fail: %v", appId, configName, err)
+		glog.Errorf("change app(%d) config(%s) state fail: %v", appId, node, configName, err)
 		return utils.NewError(utils.EcodeSystemError, "change app config state fail")
 	} else {
 		return nil

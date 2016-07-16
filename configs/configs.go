@@ -69,7 +69,7 @@ func (ctrl *ConfigCtrl) Range(ctx context.Context, from, end string, sortOption 
 	}
 }
 
-func (ctrl *ConfigCtrl) Get(ctx context.Context, appId int64, name string) (*ConfigItem, int64, error) {
+func (ctrl *ConfigCtrl) Get(ctx context.Context, appId int64, node, name string) (*ConfigItem, int64, error) {
 	if err := checkName(name); err != nil {
 		return nil, 0, err
 	}
@@ -79,7 +79,7 @@ func (ctrl *ConfigCtrl) Get(ctx context.Context, appId int64, name string) (*Con
 			return nil, 0, utils.NewError(utils.EcodeNotFound, "")
 		}
 		cfg := configFromKv(name, resp.Kvs[0])
-		if err := ctrl.changeAppConfigState(appId, name, cfg.Version); err != nil {
+		if err := ctrl.changeAppConfigState(appId, node, name, cfg.Version); err != nil {
 			return nil, 0, err
 		}
 		return &cfg, resp.Header.Revision, nil
@@ -121,7 +121,7 @@ func (ctrl *ConfigCtrl) Put(ctx context.Context, name, value string, version int
 	}
 }
 
-func (ctrl *ConfigCtrl) Watch(ctx context.Context, appId int64, name string, revision int64) (*ConfigItem, int64, error) {
+func (ctrl *ConfigCtrl) Watch(ctx context.Context, appId int64, node, name string, revision int64) (*ConfigItem, int64, error) {
 	if err := checkName(name); err != nil {
 		return nil, 0, err
 	}
@@ -146,7 +146,7 @@ func (ctrl *ConfigCtrl) Watch(ctx context.Context, appId int64, name string, rev
 		switch event.Type {
 		case mvccpb.PUT:
 			cfg := configFromKv(name, event.Kv)
-			if err := ctrl.changeAppConfigState(appId, name, cfg.Version); err != nil {
+			if err := ctrl.changeAppConfigState(appId, node, name, cfg.Version); err != nil {
 				return nil, 0, err
 			}
 			return &cfg, resp.Header.Revision, nil
