@@ -1,7 +1,6 @@
 package configs
 
 import (
-	"github.com/gocomm/dbutil"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
 	"time"
@@ -18,11 +17,12 @@ type DBConfigItem struct {
 type ConfigHistory struct {
 	Id         int64     `json:"id"`
 	Name       string    `json:"name"`
+	AppId      int64     `json:"modified_by"`
 	Value      string    `json:"value"`
 	CreateTime time.Time `json:"create_time"`
 }
 
-func (ctrl *ConfigCtrl) setDBConfig(name, value string) (rerr error) {
+func (ctrl *ConfigCtrl) setDBConfig(name string, appId int64, value string) (rerr error) {
 	tx, err := ctrl.db.Begin()
 	if err != nil {
 		glog.Errorf("new db tx fail: %v", err)
@@ -44,8 +44,8 @@ func (ctrl *ConfigCtrl) setDBConfig(name, value string) (rerr error) {
 		glog.Errorf("insert db config(%s) fail: %v", name, err)
 		return utils.NewError(utils.EcodeSystemError, "update db config fail")
 	}
-	if _, err := tx.Exec(`insert into config_histories(name,value,create_time)
-                          values(?,?,now())`, name, value); err != nil {
+	if _, err := tx.Exec(`insert into config_histories(name,app_id,value,create_time)
+                          values(?,?,?,now())`, name, appId, value); err != nil {
 		glog.Errorf("insert db config history fail: %v", err)
 		return utils.NewError(utils.EcodeSystemError, "insert db config history fail")
 	}
@@ -59,13 +59,13 @@ func (ctrl *ConfigCtrl) setDBConfig(name, value string) (rerr error) {
 }
 
 type AppConfigState struct {
-	Id         int64             `json:"id"`
-	AppId      int64             `json:"app_id"`
-	AppNode    dbutil.NullString `json:"app_node"`
-	ConfigName string            `json:"config_name"`
-	Version    int64             `json:"version"`
-	CreateTime time.Time         `json:"create_time"`
-	ModifyTime time.Time         `json:"modify_time"`
+	Id         int64     `json:"id"`
+	AppId      int64     `json:"app_id"`
+	AppNode    string    `json:"app_node"`
+	ConfigName string    `json:"config_name"`
+	Version    int64     `json:"version"`
+	CreateTime time.Time `json:"create_time"`
+	ModifyTime time.Time `json:"modify_time"`
 }
 
 func (ctrl *ConfigCtrl) changeAppConfigState(appId int64, appNode, configName string, version int64) error {
@@ -73,16 +73,11 @@ func (ctrl *ConfigCtrl) changeAppConfigState(appId int64, appNode, configName st
 		return nil
 	}
 
-	var node dbutil.NullString
-	if appNode != "" {
-		node.String, node.Valid = appNode, true
-	}
-
-	if _, err := ctrl.db.Exec(`insert into app_config_states(app_id,node,config_name,version,create_time,modify_time)
+	if _, err := ctrl.db.Exec(`insert into app_config_states(app_id,app_node,config_name,version,create_time,modify_time)
                             values(?,?,?,?,now(),now())
-                            on duplicate key update version=?,modify_time=now()`,
-		appId, configName, version, version); err != nil {
-		glog.Errorf("change app(%d) config(%s) state fail: %v", appId, node, configName, err)
+                            on duplicate key update version=?`,
+		appId, appNode, configName, version, version); err != nil {
+		glog.Errorf("change app(%d - %s) config(%s) state(ver: %d) fail: %v", appId, appNode, configName, version, err)
 		return utils.NewError(utils.EcodeSystemError, "change app config state fail")
 	} else {
 		return nil

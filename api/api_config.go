@@ -66,7 +66,7 @@ func (server *APIServer) PutConfig(c echo.Context) error {
 		return err
 	}
 
-	if rev, err := server.configs.Put(context.Background(), c.P(0), value, version); err == nil {
+	if rev, err := server.configs.Put(context.Background(), c.P(0), server.appId(c), value, version); err == nil {
 		return JsonResult(c, ConfigPutResult{Revision: rev})
 	} else {
 		return JsonError(c, err)

@@ -24,7 +24,7 @@
 CREATE TABLE `app_config_states` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `app_id` bigint(20) NOT NULL,
-  `app_node` varchar(32) DEFAULT NULL,
+  `app_node` varchar(32) NOT NULL,
   `config_name` varchar(64) NOT NULL,
   `version` bigint(20) NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -64,6 +64,7 @@ CREATE TABLE `apps` (
 CREATE TABLE `config_histories` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `name` varchar(64) NOT NULL,
+  `app_id` bigint(20) NOT NULL,
   `value` text NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -168,4 +169,4 @@ CREATE TABLE `perms` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-07-16 22:25:25
+-- Dump completed on 2016-07-17 20:59:33

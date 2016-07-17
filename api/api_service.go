@@ -17,9 +17,10 @@ const (
 
 type ServicePlugResult struct {
 	LeaseID clientv3.LeaseID `json:"lease_id"`
+	TTL     int64            `json:"ttl"`
 }
 
-func (server *APIServer) PulgService(c echo.Context) error {
+func (server *APIServer) PlugService(c echo.Context) error {
 	ttl, ok, err := IntFormParamD(c, "ttl", 60)
 	if !ok {
 		return err
@@ -45,7 +46,7 @@ func (server *APIServer) PulgService(c echo.Context) error {
 	if leaseId, err := server.services.Plug(context.Background(),
 		time.Duration(ttl)*time.Second, clientv3.LeaseID(leaseId),
 		&desc, &endpoint); err == nil {
-		return JsonResult(c, ServicePlugResult{LeaseID: leaseId})
+		return JsonResult(c, ServicePlugResult{LeaseID: leaseId, TTL: ttl})
 	} else {
 		return JsonError(c, err)
 	}
@@ -76,7 +77,7 @@ func (server *APIServer) PlugAllService(c echo.Context) error {
 	if leaseId, err := server.services.PlugAllService(context.Background(),
 		time.Duration(ttl)*time.Second, clientv3.LeaseID(leaseId),
 		desces, &endpoint); err == nil {
-		return JsonResult(c, ServicePlugResult{LeaseID: leaseId})
+		return JsonResult(c, ServicePlugResult{LeaseID: leaseId, TTL: ttl})
 	} else {
 		return JsonError(c, err)
 	}

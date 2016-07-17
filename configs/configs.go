@@ -94,7 +94,7 @@ func configFromKv(name string, kv *mvccpb.KeyValue) ConfigItem {
 		Version: kv.Version}
 }
 
-func (ctrl *ConfigCtrl) Put(ctx context.Context, name, value string, version int64) (int64, error) {
+func (ctrl *ConfigCtrl) Put(ctx context.Context, name string, appId int64, value string, version int64) (int64, error) {
 	if err := checkName(name); err != nil {
 		return 0, err
 	}
@@ -113,7 +113,7 @@ func (ctrl *ConfigCtrl) Put(ctx context.Context, name, value string, version int
 		} else if !resp.Succeeded {
 			return 0, utils.NewError(utils.EcodeInvalidVersion, "")
 		} else {
-			if err := ctrl.setDBConfig(name, value); err != nil {
+			if err := ctrl.setDBConfig(name, appId, value); err != nil {
 				return 0, err
 			}
 			return resp.Header.Revision, nil

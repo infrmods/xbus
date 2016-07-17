@@ -58,7 +58,7 @@ func (server *APIServer) Start() error {
 	server.registerServiceAPIs(e.Group("/api/services"))
 	server.registerConfigAPIs(e.Group("/api/configs"))
 	server.registerAppAPIs(e.Group("/api/apps"))
-	server.registerAppAPIs(e.Group("/api/leases"))
+	server.registerLeaseAPIs(e.Group("/api/leases"))
 	var std *standard.Server
 	addr := server.config.Listen
 	if server.config.CertFile != "" {
@@ -165,7 +165,7 @@ func (server *APIServer) newPermChecker(permType int, needWrite bool) echo.Middl
 }
 
 func (server *APIServer) registerServiceAPIs(g *echo.Group) {
-	g.Post("/:name/:version", echo.HandlerFunc(server.PulgService),
+	g.Post("/:name/:version", echo.HandlerFunc(server.PlugService),
 		server.newPermChecker(apps.PermTypeService, true))
 	g.Delete("/:name/:version/:id", echo.HandlerFunc(server.UnplugService),
 		server.newPermChecker(apps.PermTypeService, true))
