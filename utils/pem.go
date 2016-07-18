@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"os"
 )
 
@@ -37,4 +38,38 @@ func WritePrivateKey(path string, perm os.FileMode, key crypto.Signer) error {
 
 func WriteCert(path string, perm os.FileMode, derBytes []byte) error {
 	return WritePem(path, perm, "CERTIFICATE", derBytes)
+}
+
+func ReadPEM(path string) (*pem.Block, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open pem file(%s) fail: %v", path, err)
+	}
+	defer f.Close()
+
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("read pem file(%s) fail: %v", path, err)
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, fmt.Errorf("invalid pem file: %s", path)
+	}
+	return block, nil
+}
+
+func ReadPEMCertificate(path string) (*x509.Certificate, error) {
+	if block, err := ReadPEM(path); err == nil {
+		if block.Type != "CERTIFICATE" {
+			return nil, fmt.Errorf("invalid cert(%s) type: %s", path, block.Type)
+		}
+		if cert, err := x509.ParseCertificate(block.Bytes); err == nil {
+			return cert, nil
+		} else {
+			return nil, fmt.Errorf("parse cert(%s) fail: %v", path, err)
+		}
+	} else {
+		return nil, err
+	}
 }

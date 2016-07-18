@@ -9,9 +9,7 @@ import (
 	"fmt"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
-	"io/ioutil"
 	"math/big"
-	"os"
 	"time"
 )
 
@@ -20,9 +18,8 @@ type SerialGenerator interface {
 }
 
 type CertsConfig struct {
-	RootCert     string `default:"rootcert.pem"`
-	RootKey      string `default:"rootkey.pem"`
-	Organization string `default:"XBus"`
+	RootCert string `default:"rootcert.pem"`
+	RootKey  string `default:"rootkey.pem"`
 }
 
 type CertsCtrl struct {
@@ -32,27 +29,8 @@ type CertsCtrl struct {
 	serialGenerator SerialGenerator
 }
 
-func readPEM(path string) (*pem.Block, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("open pem file(%s) fail: %v", path, err)
-	}
-	defer f.Close()
-
-	data, err := ioutil.ReadAll(f)
-	if err != nil {
-		return nil, fmt.Errorf("read pem file(%s) fail: %v", path, err)
-	}
-
-	block, _ := pem.Decode(data)
-	if block == nil {
-		return nil, fmt.Errorf("invalid pem file: %s", path)
-	}
-	return block, nil
-}
-
 func NewCertsCtrl(config *CertsConfig, serialGenerator SerialGenerator) (*CertsCtrl, error) {
-	certBlock, err := readPEM(config.RootCert)
+	certBlock, err := utils.ReadPEM(config.RootCert)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +39,7 @@ func NewCertsCtrl(config *CertsConfig, serialGenerator SerialGenerator) (*CertsC
 		return nil, fmt.Errorf("parse root cert fail: %v", err)
 	}
 
-	keyBlock, err := readPEM(config.RootKey)
+	keyBlock, err := utils.ReadPEM(config.RootKey)
 	if err != nil {
 		return nil, err
 	}

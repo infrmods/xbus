@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"flag"
 	"github.com/coreos/etcd/clientv3"
@@ -61,10 +63,22 @@ func (x *XBus) NewDB() *sql.DB {
 }
 
 func (x *XBus) NewEtcdClient() *clientv3.Client {
+	var tlsConfig *tls.Config
+	if x.Config.Etcd.CACert != "" {
+		cert, err := utils.ReadPEMCertificate(x.Config.Etcd.CACert)
+		if err != nil {
+			glog.Errorf("read etcd's cacertfail: %v", err)
+			os.Exit(-1)
+		}
+
+		pool := x509.NewCertPool()
+		pool.AddCert(cert)
+		tlsConfig = &tls.Config{RootCAs: pool}
+	}
 	etcdConfig := clientv3.Config{
 		Endpoints:   x.Config.Etcd.Endpoints,
 		DialTimeout: x.Config.Etcd.Timeout,
-		TLS:         x.Config.Etcd.TLS}
+		TLS:         tlsConfig}
 	etcdClient, err := clientv3.New(etcdConfig)
 	if err != nil {
 		glog.Errorf("create etcd clientv3 fail: %v", err)

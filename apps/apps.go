@@ -10,6 +10,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
 	"math/big"
+	"regexp"
 )
 
 var SERIAL_CONFIG_ITEM = "cert_serial"
@@ -86,7 +87,12 @@ func (ctrl *AppCtrl) GetAppCertPool() *x509.CertPool {
 	return ctrl.CertsManager.CertPool()
 }
 
+var rAppName = regexp.MustCompile(`^[a-zA-Z0-9-_]+$`)
+
 func (ctrl *AppCtrl) NewApp(app *App, pk crypto.PublicKey, dnsNames []string, days int) (privKey crypto.Signer, err error) {
+	if !rAppName.MatchString(app.Name) {
+		return nil, utils.Errorf(utils.EcodeInvalidName, "invalid app name: %s", app.Name)
+	}
 	if pk == nil {
 		privKey, err = utils.NewPrivateKey(ctrl.config.EcdsaCruve, ctrl.config.RSABits)
 		if err != nil {
