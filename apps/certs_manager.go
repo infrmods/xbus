@@ -10,6 +10,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
 	"math/big"
+	"net"
 	"time"
 )
 
@@ -80,7 +81,7 @@ func (mgr *CertsCtrl) CertPool() *x509.CertPool {
 }
 
 func (mgr *CertsCtrl) NewCert(pubkey crypto.PublicKey, subject pkix.Name,
-	dnsNames []string, days int) ([]byte, error) {
+	dnsNames []string, ips []net.IP, days int) ([]byte, error) {
 	serialNumber, err := mgr.serialGenerator.Generate()
 	if err != nil {
 		return nil, err
@@ -90,6 +91,7 @@ func (mgr *CertsCtrl) NewCert(pubkey crypto.PublicKey, subject pkix.Name,
 		SerialNumber: serialNumber,
 		Subject:      subject,
 		DNSNames:     dnsNames,
+		IPAddresses:  ips,
 
 		NotBefore: time.Now(),
 		NotAfter:  time.Now().Add(time.Duration(days) * time.Hour * 24),

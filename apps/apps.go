@@ -10,6 +10,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
 	"math/big"
+	"net"
 	"regexp"
 )
 
@@ -89,7 +90,7 @@ func (ctrl *AppCtrl) GetAppCertPool() *x509.CertPool {
 
 var rAppName = regexp.MustCompile(`^[a-zA-Z0-9-_]+$`)
 
-func (ctrl *AppCtrl) NewApp(app *App, pk crypto.PublicKey, dnsNames []string, days int) (privKey crypto.Signer, err error) {
+func (ctrl *AppCtrl) NewApp(app *App, pk crypto.PublicKey, dnsNames []string, ips []net.IP, days int) (privKey crypto.Signer, err error) {
 	if !rAppName.MatchString(app.Name) {
 		return nil, utils.Errorf(utils.EcodeInvalidName, "invalid app name: %s", app.Name)
 	}
@@ -104,7 +105,7 @@ func (ctrl *AppCtrl) NewApp(app *App, pk crypto.PublicKey, dnsNames []string, da
 
 	name := pkix.Name{CommonName: app.Name,
 		Organization: []string{ctrl.config.Organization}}
-	if certPem, err := ctrl.CertsManager.NewCert(pk, name, dnsNames, days); err == nil {
+	if certPem, err := ctrl.CertsManager.NewCert(pk, name, dnsNames, ips, days); err == nil {
 		app.Cert = string(certPem)
 	} else {
 		glog.Errorf("generate cert fail: %v", err)

@@ -7,6 +7,7 @@ import (
 	"github.com/infrmods/xbus/apps"
 	"github.com/infrmods/xbus/utils"
 	"golang.org/x/net/context"
+	"net"
 	"strings"
 )
 
@@ -14,6 +15,7 @@ type NewAppCmd struct {
 	AppName     string
 	Description string
 	DNSNames    string
+	IPAddresses string
 	RSABits     int
 	EcdsaCruve  string
 	Days        int
@@ -36,6 +38,7 @@ func (cmd *NewAppCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.AppName, "name", "", "app name")
 	f.StringVar(&cmd.Description, "desc", "", "app description")
 	f.StringVar(&cmd.DNSNames, "dns", "", "DNSNames, sparated by comma")
+	f.StringVar(&cmd.IPAddresses, "ip", "", "IPAddresses, sparated by comma")
 	f.IntVar(&cmd.RSABits, "rsa-bits", 2048, "RSA key size in bits")
 	f.StringVar(&cmd.EcdsaCruve, "ecdsa-curve", "", "ECDSA curve(P224/P256/P384/P521), empty if use RSA")
 	f.IntVar(&cmd.Days, "days", 365*8, "cert valid for N days")
@@ -55,6 +58,16 @@ func (cmd *NewAppCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface
 	if cmd.KeyFile == "" {
 		cmd.KeyFile = cmd.AppName + "key.pem"
 	}
+	ipStrs := strings.Split(cmd.IPAddresses, ",")
+	ips := make([]net.IP, 0, len(ipStrs))
+	for _, ipStr := range ipStrs {
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			glog.Errorf("invalid ip: %s", ipStr)
+			return subcommands.ExitUsageError
+		}
+		ips = append(ips, ip)
+	}
 
 	privKey, err := utils.NewPrivateKey(cmd.EcdsaCruve, cmd.RSABits)
 	if err != nil {
@@ -66,7 +79,7 @@ func (cmd *NewAppCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface
 	appCtrl := x.NewAppCtrl(x.NewDB())
 	app := apps.App{Status: utils.StatusOk, Name: cmd.AppName,
 		Description: cmd.Description}
-	if _, err := appCtrl.NewApp(&app, privKey.Public(), strings.Split(cmd.DNSNames, ","), cmd.Days); err != nil {
+	if _, err := appCtrl.NewApp(&app, privKey.Public(), strings.Split(cmd.DNSNames, ","), ips, cmd.Days); err != nil {
 		glog.Errorf("create app fail: %v", err)
 		return subcommands.ExitFailure
 	}
