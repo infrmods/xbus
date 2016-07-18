@@ -58,15 +58,18 @@ func (cmd *NewAppCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface
 	if cmd.KeyFile == "" {
 		cmd.KeyFile = cmd.AppName + "key.pem"
 	}
-	ipStrs := strings.Split(cmd.IPAddresses, ",")
-	ips := make([]net.IP, 0, len(ipStrs))
-	for _, ipStr := range ipStrs {
-		ip := net.ParseIP(ipStr)
-		if ip == nil {
-			glog.Errorf("invalid ip: %s", ipStr)
-			return subcommands.ExitUsageError
+	var ips []net.IP
+	if cmd.IPAddresses != "" {
+		ipStrs := strings.Split(cmd.IPAddresses, ",")
+		ips := make([]net.IP, 0, len(ipStrs))
+		for _, ipStr := range ipStrs {
+			ip := net.ParseIP(ipStr)
+			if ip == nil {
+				glog.Errorf("invalid ip: %s", ipStr)
+				return subcommands.ExitUsageError
+			}
+			ips = append(ips, ip)
 		}
-		ips = append(ips, ip)
 	}
 
 	privKey, err := utils.NewPrivateKey(cmd.EcdsaCruve, cmd.RSABits)
