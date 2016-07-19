@@ -61,7 +61,7 @@ func (cmd *NewAppCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface
 	var ips []net.IP
 	if cmd.IPAddresses != "" {
 		ipStrs := strings.Split(cmd.IPAddresses, ",")
-		ips := make([]net.IP, 0, len(ipStrs))
+		ips = make([]net.IP, 0, len(ipStrs))
 		for _, ipStr := range ipStrs {
 			ip := net.ParseIP(ipStr)
 			if ip == nil {

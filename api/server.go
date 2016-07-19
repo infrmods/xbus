@@ -125,8 +125,8 @@ func (server *APIServer) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func (server *APIServer) appId(c echo.Context) int64 {
-	if x := c.Get("app"); x != nil {
-		return x.(*apps.App).Id
+	if x := c.Get("app").(*apps.App); x != nil {
+		return x.Id
 	}
 	return 0
 }
