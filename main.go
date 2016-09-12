@@ -101,8 +101,10 @@ func main() {
 	subcommands.Register(subcommands.FlagsCommand(), "")
 	subcommands.Register(subcommands.CommandsCommand(), "")
 	subcommands.Register(&NewAppCmd{}, "")
-	subcommands.Register(RunCommand{}, "")
+	subcommands.Register(&RunCommand{}, "")
 	subcommands.Register(&GenRootCmd{}, "")
+	subcommands.Register(&ListAppCmd{}, "")
+	subcommands.Register(&ListGroupCmd{}, "")
 
 	flag.Set("logtostderr", "true")
 	flag.Parse()

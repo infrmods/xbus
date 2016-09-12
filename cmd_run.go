@@ -14,22 +14,22 @@ import (
 type RunCommand struct {
 }
 
-func (cmd RunCommand) Name() string {
+func (cmd *RunCommand) Name() string {
 	return "run"
 }
 
-func (cmd RunCommand) Synopsis() string {
+func (cmd *RunCommand) Synopsis() string {
 	return "run server"
 }
 
-func (cmd RunCommand) SetFlags(f *flag.FlagSet) {
+func (cmd *RunCommand) SetFlags(f *flag.FlagSet) {
 }
 
-func (cmd RunCommand) Usage() string {
+func (cmd *RunCommand) Usage() string {
 	return ""
 }
 
-func (cmd RunCommand) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+func (cmd *RunCommand) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	x := NewXBus()
 	db := x.NewDB()
 	etcdClient := x.NewEtcdClient()

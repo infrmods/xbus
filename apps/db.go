@@ -48,6 +48,11 @@ func InsertApp(db *sql.DB, app *App) error {
 	}
 }
 
+func GetAppList(db *sql.DB) (apps []App, err error) {
+	err = dbutil.Query(db, &apps, `select * from apps`)
+	return
+}
+
 func GetAppByName(db *sql.DB, name string) (*App, error) {
 	var app App
 	if err := dbutil.Query(db, &app,
@@ -99,6 +104,11 @@ func InsertGroup(db *sql.DB, group *Group) error {
 	} else {
 		return err
 	}
+}
+
+func GetGroupList(db *sql.DB) (groups []Group, err error) {
+	err = dbutil.Query(db, &groups, `select * from groups`)
+	return
 }
 
 func GetGroupByName(db *sql.DB, name string) (*Group, error) {
