@@ -22,18 +22,25 @@ func JsonResult(c echo.Context, result interface{}) error {
 	return c.JSON(http.StatusOK, Response{Ok: true, Result: result})
 }
 
+func formatError(err error) *utils.Error {
+	if e, ok := err.(*utils.Error); ok {
+		return e
+	} else {
+		return &utils.Error{Code: utils.EcodeSystemError, Message: err.Error()}
+	}
+}
+
 func JsonError(c echo.Context, err error) error {
 	code := http.StatusOK
-	if e, ok := err.(*utils.Error); ok {
-		if e.Code == utils.EcodeSystemError {
-			code = http.StatusServiceUnavailable
-		}
+	e := formatError(err)
+	if e.Code == utils.EcodeSystemError {
+		code = http.StatusServiceUnavailable
 	}
 	return c.JSON(code, Response{Ok: false, Error: err})
 }
 
 func JsonErrorC(c echo.Context, code int, err error) error {
-	return c.JSON(code, Response{Ok: false, Error: err})
+	return c.JSON(code, Response{Ok: false, Error: formatError(err)})
 }
 
 func JsonErrorf(c echo.Context, errCode string, format string, args ...interface{}) error {
