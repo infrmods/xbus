@@ -229,7 +229,14 @@ func (ctrl *ServiceCtrl) Watch(ctx context.Context, name, version string,
 	key := ctrl.serviceKeyPrefix(name, version)
 	watcher := clientv3.NewWatcher(ctrl.etcdClient)
 	defer watcher.Close()
-	watchCh := watcher.Watch(ctx, key, clientv3.WithRev(revision), clientv3.WithPrefix())
+
+	var watchCh clientv3.WatchChan
+	if revision > 0 {
+		watchCh = watcher.Watch(ctx, key, clientv3.WithRev(revision), clientv3.WithPrefix())
+	} else {
+		watchCh = watcher.Watch(ctx, key, clientv3.WithPrefix())
+	}
+
 	resp := <-watchCh
 	if !resp.Canceled {
 		return ctrl.query(ctx, name, version)

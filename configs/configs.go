@@ -133,7 +133,7 @@ func (ctrl *ConfigCtrl) Watch(ctx context.Context, appId int64, node, name strin
 	if revision > 0 {
 		watchCh = watcher.Watch(ctx, key, clientv3.WithRev(revision))
 	} else {
-		watchCh = watcher.Watch(ctx, key, clientv3.WithRev(revision))
+		watchCh = watcher.Watch(ctx, key)
 	}
 	resp := <-watchCh
 	if err := resp.Err(); err != nil {

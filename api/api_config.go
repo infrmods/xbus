@@ -74,7 +74,7 @@ func (server *APIServer) PutConfig(c echo.Context) error {
 }
 
 func (server *APIServer) Watch(c echo.Context) error {
-	revision, ok, err := IntQueryParamD(c, "version", 0)
+	revision, ok, err := IntQueryParamD(c, "revision", 0)
 	if !ok {
 		return err
 	}
