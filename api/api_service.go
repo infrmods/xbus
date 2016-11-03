@@ -138,7 +138,7 @@ func (server *APIServer) QueryServiceAllVersions(c echo.Context) error {
 }
 
 func (server *APIServer) WatchService(c echo.Context) error {
-	revision, ok, err := IntQueryParam(c, "revision")
+	revision, ok, err := IntQueryParamD(c, "revision", 0)
 	if !ok {
 		return err
 	}
