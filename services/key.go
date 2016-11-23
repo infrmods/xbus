@@ -74,9 +74,19 @@ func (ctrl *ServiceCtrl) ensureServiceDesc(ctx context.Context, name, version, v
 			}
 			if len(resp.Responses) == 1 {
 				if rangeResp := resp.Responses[0].GetResponseRange(); rangeResp != nil {
-					if len(rangeResp.Kvs) == 0 {
+					if len(rangeResp.Kvs) == 0 || ctrl.config.PermitChangeDesc {
+						var ver int64 = 0
+						if len(rangeResp.Kvs) > 0 {
+							for _, k := range rangeResp.Kvs {
+								if string(k.Key) == key {
+									ver = k.Version
+									break
+								}
+							}
+							glog.V(1).Infof("changed desc: %s:%s", name, version)
+						}
 						txn := ctrl.etcdClient.Txn(ctx).If(
-							clientv3.Compare(clientv3.Version(key), "=", 0),
+							clientv3.Compare(clientv3.Version(key), "=", ver),
 						).Then(clientv3.OpPut(key, value))
 						if resp, err := txn.Commit(); err == nil {
 							if resp.Succeeded {

@@ -48,7 +48,8 @@ type Service struct {
 }
 
 type Config struct {
-	KeyPrefix string `default:"/services" yaml:"key_prefix"`
+	KeyPrefix        string `default:"/services" yaml:"key_prefix"`
+	PermitChangeDesc bool   `default:false yaml:"permit_change_desc"`
 }
 
 type ServiceCtrl struct {
@@ -211,6 +212,9 @@ func (ctrl *ServiceCtrl) QueryAllVersions(ctx context.Context, name string) (map
 func (ctrl *ServiceCtrl) query(ctx context.Context, name, version string) (*Service, int64, error) {
 	key := ctrl.serviceKeyPrefix(name, version)
 	if resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix()); err == nil {
+		if len(resp.Kvs) == 0 {
+			return nil, 0, utils.Errorf(utils.EcodeNotFound, "no such service: %s:%s", name, version)
+		}
 		if service, err := ctrl.makeService(name, version, resp.Kvs); err == nil {
 			return service, resp.Header.Revision, nil
 		} else {
