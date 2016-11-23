@@ -133,31 +133,42 @@ func (server *APIServer) appId(c echo.Context) int64 {
 
 var ErrNotPermitted = utils.NewError(utils.EcodeNotPermitted, "not permitted")
 
+func (server *APIServer) checkPerm(c echo.Context, permType int, needWrite bool, name string) (bool, error) {
+	app := c.Get("app").(*apps.App)
+	if app == nil {
+		if needWrite {
+			return false, nil
+		}
+		if has, err := server.apps.HasAnyPrefixPerm(permType, apps.PermPublicTargetId, nil, needWrite, name); err == nil {
+			if !has {
+				return false, nil
+			}
+		} else {
+			return false, err
+		}
+	} else if !strings.HasPrefix(name, app.Name+".") {
+		groupIds := c.Get("groupIds").([]int64)
+		if has, err := server.apps.HasAnyPrefixPerm(permType, app.Id, groupIds, needWrite, name); err == nil {
+			if !has {
+				return false, nil
+			}
+		} else {
+			return false, err
+		}
+	}
+
+	return true, nil
+}
+
 func (server *APIServer) newPermChecker(permType int, needWrite bool) echo.MiddlewareFunc {
 	return echo.MiddlewareFunc(func(h echo.HandlerFunc) echo.HandlerFunc {
 		return echo.HandlerFunc(func(c echo.Context) error {
-			name := c.P(0)
-			app := c.Get("app").(*apps.App)
-			if app == nil {
-				if needWrite {
+			if ok, err := server.checkPerm(c, permType, needWrite, c.P(0)); err == nil {
+				if !ok {
 					return JsonError(c, ErrNotPermitted)
 				}
-				if has, err := server.apps.HasAnyPrefixPerm(permType, apps.PermPublicTargetId, nil, needWrite, name); err == nil {
-					if !has {
-						return JsonError(c, ErrNotPermitted)
-					}
-				} else {
-					return JsonError(c, err)
-				}
-			} else if !strings.HasPrefix(name, app.Name+".") {
-				groupIds := c.Get("groupIds").([]int64)
-				if has, err := server.apps.HasAnyPrefixPerm(permType, app.Id, groupIds, needWrite, name); err == nil {
-					if !has {
-						return JsonError(c, ErrNotPermitted)
-					}
-				} else {
-					return JsonError(c, err)
-				}
+			} else {
+				return JsonError(c, err)
 			}
 			return h(c)
 		})
@@ -169,8 +180,7 @@ func (server *APIServer) registerServiceAPIs(g *echo.Group) {
 		server.newPermChecker(apps.PermTypeService, true))
 	g.Delete("/:name/:version/:id", echo.HandlerFunc(server.UnplugService),
 		server.newPermChecker(apps.PermTypeService, true))
-	g.Post("", echo.HandlerFunc(server.PlugAllService),
-		server.newPermChecker(apps.PermTypeService, true))
+	g.Post("", echo.HandlerFunc(server.PlugAllService))
 	g.Put("/:name/:version/:id", echo.HandlerFunc(server.UpdateService),
 		server.newPermChecker(apps.PermTypeService, true))
 

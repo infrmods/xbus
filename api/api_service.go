@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/coreos/etcd/clientv3"
+	"github.com/infrmods/xbus/apps"
 	"github.com/infrmods/xbus/services"
 	"github.com/infrmods/xbus/utils"
 	"github.com/labstack/echo"
@@ -69,6 +70,16 @@ func (server *APIServer) PlugAllService(c echo.Context) error {
 	if ok, err := JsonFormParam(c, "desces", &desces); !ok {
 		return err
 	}
+	for _, desc := range desces {
+		if ok, err := server.checkPerm(c, apps.PermTypeService, true, desc.Name); err == nil {
+			if !ok {
+				return utils.Errorf(utils.EcodeNotPermitted, "not permitted: %s", desc.Name)
+			}
+		} else {
+			return JsonError(c, err)
+		}
+	}
+
 	var endpoint services.ServiceEndpoint
 	if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
 		return err
