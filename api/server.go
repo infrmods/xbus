@@ -54,6 +54,11 @@ func NewAPIServer(config *Config, etcdClient *clientv3.Client,
 func (server *APIServer) Start() error {
 	e := echo.New()
 	e.Use(middleware.Recover())
+	if glog.V(1) {
+		e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+			Format: "method=${method}, uri=${uri}, status=${status}\n",
+		}))
+	}
 	e.Use(echo.MiddlewareFunc(server.verifyApp))
 	server.registerServiceAPIs(e.Group("/api/services"))
 	server.registerConfigAPIs(e.Group("/api/configs"))
