@@ -76,7 +76,7 @@ func (ctrl *ConfigCtrl) Get(ctx context.Context, appId int64, node, name string)
 
 	if resp, err := ctrl.etcdClient.Get(ctx, ctrl.configKey(name)); err == nil {
 		if resp.Kvs == nil {
-			return nil, 0, utils.NewError(utils.EcodeNotFound, "")
+			return nil, 0, utils.NewError(utils.EcodeNotFound, name)
 		}
 		cfg := configFromKv(name, resp.Kvs[0])
 		if err := ctrl.changeAppConfigState(appId, node, name, cfg.Version); err != nil {

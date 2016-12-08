@@ -209,6 +209,7 @@ func (server *APIServer) registerConfigAPIs(g *echo.Group) {
 	// g.Get("", echo.HandlerFunc(server.RangeConfigs))
 	g.Get("/:name", echo.HandlerFunc(server.GetConfig),
 		server.newPermChecker(apps.PermTypeConfig, false))
+	g.Get("", echo.HandlerFunc(server.GetAllConfigs))
 	g.Put("/:name", echo.HandlerFunc(server.PutConfig),
 		server.newPermChecker(apps.PermTypeConfig, true))
 }
