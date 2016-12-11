@@ -26,7 +26,6 @@ func ListDBConfigs(db *sql.DB, prefix string, skip, limit int) ([]string, error)
 	q += ` order by modify_time desc limit ?,?`
 	args = append(args, skip)
 	args = append(args, limit)
-	glog.Infof("sql: %v", q)
 
 	var items []string
 	if err := dbutil.Query(db, &items, q, args...); err == nil {

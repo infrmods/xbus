@@ -110,6 +110,9 @@ func (ctrl *ConfigCtrl) Put(ctx context.Context, name string, appId int64, value
 	key := ctrl.configKey(name)
 	if version < 0 {
 		if resp, err := ctrl.etcdClient.Put(ctx, key, value); err == nil {
+			if err := ctrl.setDBConfig(name, appId, value); err != nil {
+				return 0, err
+			}
 			return resp.Header.Revision, nil
 		} else {
 			return 0, utils.CleanErr(err, "", "put config key(%s) fail: %v", name, err)

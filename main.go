@@ -27,8 +27,9 @@ type Config struct {
 	Api      api.Config
 
 	DB struct {
-		Driver string `default:"mysql"`
-		Source string `default:"root:passwd@/xbus?parseTime=true"`
+		Driver  string `default:"mysql"`
+		Source  string `default:"root:passwd@/xbus?parseTime=true"`
+		MaxConn int    `default:"20"`
 	}
 }
 
@@ -59,6 +60,7 @@ func (x *XBus) NewDB() *sql.DB {
 		glog.Errorf("open database fail: %v", err)
 		os.Exit(-1)
 	}
+	db.SetMaxOpenConns(x.Config.DB.MaxConn)
 	return db
 }
 
