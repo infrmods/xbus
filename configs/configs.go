@@ -69,6 +69,15 @@ func (ctrl *ConfigCtrl) Range(ctx context.Context, from, end string, sortOption 
 	}
 }
 
+func (ctrl *ConfigCtrl) ListDBConfigs(ctx context.Context, prefix string, skip, limit int) ([]string, error) {
+	if items, err := ListDBConfigs(ctrl.db, prefix, skip, limit); err == nil {
+		return items, nil
+	} else {
+		glog.Errorf("get db configs fail: %v", err)
+		return nil, utils.NewSystemError("get configs fail")
+	}
+}
+
 func (ctrl *ConfigCtrl) Get(ctx context.Context, appId int64, node, name string) (*ConfigItem, int64, error) {
 	if err := checkName(name); err != nil {
 		return nil, 0, err

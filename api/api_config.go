@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/coreos/etcd/clientv3"
 	"github.com/infrmods/xbus/apps"
 	"github.com/infrmods/xbus/configs"
 	"github.com/infrmods/xbus/utils"
@@ -11,26 +10,37 @@ import (
 	"time"
 )
 
-type RangeResult struct {
-	Configs []configs.ConfigItem `json:"configs"`
-	More    bool                 `json:"more"`
+type ListResult struct {
+	Configs []string `json:"configs"`
+	Skip    int
+	Limit   int
 }
 
-func (server *APIServer) RangeConfigs(c echo.Context) error {
-	from := c.QueryParam("from")
-	end := c.QueryParam("end")
-	sortOption := clientv3.SortOption{Target: clientv3.SortByKey}
-	switch c.QueryParam("order") {
-	case "asc", "":
-		sortOption.Order = clientv3.SortAscend
-	case "desc":
-		sortOption.Order = clientv3.SortDescend
-	default:
-		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid order")
+func (server *APIServer) ListConfig(c echo.Context) error {
+	if c.QueryParam("keys") != "" {
+		return server.GetAllConfigs(c)
 	}
 
-	if cfgs, more, err := server.configs.Range(context.Background(), from, end, &sortOption); err == nil {
-		return JsonResult(c, RangeResult{Configs: cfgs, More: more})
+	prefix := c.QueryParam("prefix")
+	if ok, err := server.checkPerm(c, apps.PermTypeConfig, false, prefix); err == nil {
+		if !ok {
+			return JsonErrorf(c, utils.EcodeNotPermitted, "not permitted")
+		}
+	} else {
+		return JsonError(c, err)
+	}
+
+	skip, ok, err := IntQueryParamD(c, "skip", 0)
+	if !ok {
+		return err
+	}
+	limit, ok, err := IntQueryParamD(c, "limit", 200)
+	if !ok {
+		return err
+	}
+
+	if configs, err := server.configs.ListDBConfigs(context.Background(), prefix, int(skip), int(limit)); err == nil {
+		return JsonResult(c, ListResult{Configs: configs, Skip: int(skip), Limit: int(limit)})
 	} else {
 		return JsonError(c, err)
 	}

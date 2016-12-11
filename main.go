@@ -32,7 +32,7 @@ type Config struct {
 	}
 }
 
-var cfgPath = flag.String("config", "", "config file path")
+var cfgPath = flag.String("config", "config.yml", "config file path")
 
 type XBus struct {
 	Config Config
@@ -105,6 +105,8 @@ func main() {
 	subcommands.Register(&GenRootCmd{}, "")
 	subcommands.Register(&ListAppCmd{}, "")
 	subcommands.Register(&ListGroupCmd{}, "")
+	subcommands.Register(&ListPerm{}, "")
+	subcommands.Register(&GrantCmd{}, "")
 
 	flag.Set("logtostderr", "true")
 	flag.Parse()

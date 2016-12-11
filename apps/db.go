@@ -169,6 +169,37 @@ type Perm struct {
 	CreateTime time.Time
 }
 
+func GetPerms(db *sql.DB, typ int, target_type *int, target_id *int64,
+	can_write *bool, prefix *string) ([]Perm, error) {
+	args := make([]interface{}, 0, 5)
+	args = append(args, typ)
+
+	q := `select * from perms where perm_type=?`
+	if target_type != nil {
+		q += ` and target_type=?`
+		args = append(args, *target_type)
+	}
+	if target_id != nil {
+		q += ` and target_id=?`
+		args = append(args, *target_id)
+	}
+	if can_write != nil {
+		q += ` and can_write=?`
+		args = append(args, *can_write)
+	}
+	if prefix != nil {
+		q += ` and content like ?`
+		args = append(args, *prefix+"%")
+	}
+
+	var perms []Perm
+	if err := dbutil.Query(db, &perms, q, args...); err == nil {
+		return perms, nil
+	} else {
+		return nil, err
+	}
+}
+
 func InsertPerm(db *sql.DB, perm *Perm) error {
 	var query string
 	if perm.CanWrite {

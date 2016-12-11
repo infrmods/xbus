@@ -1,6 +1,8 @@
 package configs
 
 import (
+	"database/sql"
+	"github.com/gocomm/dbutil"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
 	"time"
@@ -12,6 +14,26 @@ type DBConfigItem struct {
 	Value      string    `json:"value"`
 	CreateTime time.Time `json:"create_time"`
 	ModifyTime time.Time `json:"modify_time"`
+}
+
+func ListDBConfigs(db *sql.DB, prefix string, skip, limit int) ([]string, error) {
+	args := make([]interface{}, 0, 3)
+	q := `select name from configs`
+	if prefix != "" {
+		q += ` where name like ?`
+		args = append(args, prefix+"%")
+	}
+	q += ` order by modify_time desc limit ?,?`
+	args = append(args, skip)
+	args = append(args, limit)
+	glog.Infof("sql: %v", q)
+
+	var items []string
+	if err := dbutil.Query(db, &items, q, args...); err == nil {
+		return items, nil
+	} else {
+		return nil, err
+	}
 }
 
 type ConfigHistory struct {

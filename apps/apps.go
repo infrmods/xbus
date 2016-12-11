@@ -88,12 +88,18 @@ func (ctrl *AppCtrl) GetAppCertPool() *x509.CertPool {
 	return ctrl.CertsManager.CertPool()
 }
 
-var rAppName = regexp.MustCompile(`^[a-zA-Z0-9-_]+$`)
+var rAppName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-_]+$`)
 
 func (ctrl *AppCtrl) NewApp(app *App, pk crypto.PublicKey, dnsNames []string, ips []net.IP, days int) (privKey crypto.Signer, err error) {
 	if !rAppName.MatchString(app.Name) {
 		return nil, utils.Errorf(utils.EcodeInvalidName, "invalid app name: %s", app.Name)
 	}
+	for _, name := range []string{"public", "global", "app", "xbus"} {
+		if app.Name == name {
+			return nil, utils.Errorf(utils.EcodeInvalidName, "reserved name: %s", app.Name)
+		}
+	}
+
 	if pk == nil {
 		privKey, err = utils.NewPrivateKey(ctrl.config.EcdsaCruve, ctrl.config.RSABits)
 		if err != nil {
@@ -121,6 +127,37 @@ func (ctrl *AppCtrl) NewApp(app *App, pk crypto.PublicKey, dnsNames []string, ip
 		return nil, utils.NewSystemError("create app fail")
 	}
 	return
+}
+
+func (ctrl *AppCtrl) GetPerms(typ int, app_name *string, group_name *string, can_write *bool, prefix *string) ([]Perm, error) {
+	var target_type *int
+	var target_id *int64
+	if app_name != nil {
+		if app, err := GetAppByName(ctrl.db, *app_name); err == nil {
+			t := PermTargetApp
+			target_type = &t
+			target_id = &app.Id
+		} else {
+			glog.Errorf("get app(%s) fail: %v", app_name, err)
+			return nil, utils.NewSystemError("get app fail")
+		}
+	} else if group_name != nil {
+		if group, err := GetGroupByName(ctrl.db, *group_name); err == nil {
+			t := PermTargetGroup
+			target_type = &t
+			target_id = &group.Id
+		} else {
+			glog.Errorf("get group(%s) fail: %v", group_name, err)
+			return nil, utils.NewSystemError("get group fail")
+		}
+	}
+
+	if perms, err := GetPerms(ctrl.db, typ, target_type, target_id, can_write, prefix); err == nil {
+		return perms, nil
+	} else {
+		glog.Errorf("get perms fail: %v", err)
+		return nil, utils.NewSystemError("get perms fail")
+	}
 }
 
 func (ctrl *AppCtrl) GetAppByName(name string) (*App, error) {

@@ -12,7 +12,6 @@ import (
 )
 
 type NewAppCmd struct {
-	AppName     string
 	Description string
 	DNSNames    string
 	IPAddresses string
@@ -32,10 +31,11 @@ func (cmd *NewAppCmd) Synopsis() string {
 	return "create new app"
 }
 
-func (cmd *NewAppCmd) Usage() string { return "" }
+func (cmd *NewAppCmd) Usage() string {
+	return "new-app [OPTIONS] name\n"
+}
 
 func (cmd *NewAppCmd) SetFlags(f *flag.FlagSet) {
-	f.StringVar(&cmd.AppName, "name", "", "app name")
 	f.StringVar(&cmd.Description, "desc", "", "app description")
 	f.StringVar(&cmd.DNSNames, "dns", "", "DNSNames, sparated by comma")
 	f.StringVar(&cmd.IPAddresses, "ip", "", "IPAddresses, sparated by comma")
@@ -48,15 +48,16 @@ func (cmd *NewAppCmd) SetFlags(f *flag.FlagSet) {
 }
 
 func (cmd *NewAppCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface{}) subcommands.ExitStatus {
-	if cmd.AppName == "" {
-		glog.Errorf("please specify the app name")
+	if f.NArg() != 1 {
+		f.Usage()
 		return subcommands.ExitUsageError
 	}
+	appName := f.Arg(0)
 	if cmd.CertFile == "" {
-		cmd.CertFile = cmd.AppName + "cert.pem"
+		cmd.CertFile = appName + "cert.pem"
 	}
 	if cmd.KeyFile == "" {
-		cmd.KeyFile = cmd.AppName + "key.pem"
+		cmd.KeyFile = appName + "key.pem"
 	}
 	var ips []net.IP
 	if cmd.IPAddresses != "" {
@@ -80,7 +81,7 @@ func (cmd *NewAppCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface
 
 	x := NewXBus()
 	appCtrl := x.NewAppCtrl(x.NewDB())
-	app := apps.App{Status: utils.StatusOk, Name: cmd.AppName,
+	app := apps.App{Status: utils.StatusOk, Name: appName,
 		Description: cmd.Description}
 	if _, err := appCtrl.NewApp(&app, privKey.Public(), strings.Split(cmd.DNSNames, ","), ips, cmd.Days); err != nil {
 		glog.Errorf("create app fail: %v", err)
