@@ -206,7 +206,6 @@ func (server *APIServer) registerLeaseAPIs(g *echo.Group) {
 }
 
 func (server *APIServer) registerConfigAPIs(g *echo.Group) {
-	// g.Get("", echo.HandlerFunc(server.RangeConfigs))
 	g.Get("/:name", echo.HandlerFunc(server.GetConfig),
 		server.newPermChecker(apps.PermTypeConfig, false))
 	g.Get("", echo.HandlerFunc(server.ListConfig))
@@ -216,4 +215,5 @@ func (server *APIServer) registerConfigAPIs(g *echo.Group) {
 
 func (server *APIServer) registerAppAPIs(g *echo.Group) {
 	g.Get("/:name/cert", echo.HandlerFunc(server.GetAppCert))
+	g.Get("", echo.HandlerFunc(server.ListApp))
 }

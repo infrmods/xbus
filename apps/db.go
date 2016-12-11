@@ -37,6 +37,15 @@ func (app *App) Certificate() (*x509.Certificate, error) {
 	return app.certificate, nil
 }
 
+func ListApp(db *sql.DB, skip, limit int) ([]App, error) {
+	var apps []App
+	if err := dbutil.Query(db, &apps, `select * from apps order by id limit ?,?`, skip, limit); err == nil {
+		return apps, nil
+	} else {
+		return nil, err
+	}
+}
+
 func InsertApp(db *sql.DB, app *App) error {
 	if id, err := dbutil.Insert(db,
 		`insert ignore into apps(status, name, description, cert)

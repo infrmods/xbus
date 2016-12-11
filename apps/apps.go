@@ -169,6 +169,15 @@ func (ctrl *AppCtrl) GetAppByName(name string) (*App, error) {
 	}
 }
 
+func (ctrl *AppCtrl) ListApp(skip, limit int) ([]App, error) {
+	if apps, err := ListApp(ctrl.db, skip, limit); err == nil {
+		return apps, nil
+	} else {
+		glog.Errorf("list app fail: %v", err)
+		return nil, utils.NewSystemError("list app fail")
+	}
+}
+
 func (ctrl *AppCtrl) GetAppGroupByName(name string) (*App, []int64, error) {
 	if app, groupIds, err := GetAppGroupByName(ctrl.db, name); err == nil {
 		return app, groupIds, nil
