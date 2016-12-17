@@ -8,8 +8,14 @@ import (
 	"time"
 )
 
+const (
+	ConfigStatusOk      = 0
+	ConfigStatusDeleted = -1
+)
+
 type DBConfigItem struct {
 	Id         int64     `json:"id"`
+	Status     int       `json:"-"`
 	Name       string    `json:"name"`
 	Value      string    `json:"value"`
 	CreateTime time.Time `json:"create_time"`
@@ -18,9 +24,10 @@ type DBConfigItem struct {
 
 func ListDBConfigs(db *sql.DB, prefix string, skip, limit int) ([]string, error) {
 	args := make([]interface{}, 0, 3)
-	q := `select name from configs`
+	q := `select name from configs where status=?`
+	args = append(args, ConfigStatusOk)
 	if prefix != "" {
-		q += ` where name like ?`
+		q += ` and name like ?`
 		args = append(args, prefix+"%")
 	}
 	q += ` order by modify_time desc limit ?,?`
@@ -58,10 +65,10 @@ func (ctrl *ConfigCtrl) setDBConfig(name string, appId int64, value string) (rer
 		}
 	}()
 
-	if _, err := tx.Exec(`insert into configs(name,value,create_time,modify_time)
-                          values(?,?,now(),now())
-                          on duplicate key update value=?, modify_time=now()`,
-		name, value, value); err != nil {
+	if _, err := tx.Exec(`insert into configs(status,name,value,create_time,modify_time)
+                          values(?,?,?,now(),now())
+                          on duplicate key update status=?, value=?, modify_time=now()`,
+		ConfigStatusOk, name, value, ConfigStatusOk, value); err != nil {
 		glog.Errorf("insert db config(%s) fail: %v", name, err)
 		return utils.NewError(utils.EcodeSystemError, "update db config fail")
 	}
@@ -77,6 +84,13 @@ func (ctrl *ConfigCtrl) setDBConfig(name string, appId int64, value string) (rer
 		glog.Errorf("set db config(%s), commit fail: %v", name, err)
 		return utils.NewError(utils.EcodeSystemError, "commit db fail")
 	}
+}
+
+func (ctrl *ConfigCtrl) deleteDBConfig(name string) error {
+	if _, err := ctrl.db.Exec(`update configs set status=? where name=?`, ConfigStatusDeleted, name); err != nil {
+		return utils.NewError(utils.EcodeSystemError, "delete config fail")
+	}
+	return nil
 }
 
 type AppConfigState struct {

@@ -101,6 +101,14 @@ func (server *APIServer) GetAllConfigs(c echo.Context) error {
 	return JsonResult(c, result)
 }
 
+func (server *APIServer) DeleteConfig(c echo.Context) error {
+	if err := server.configs.Delete(context.Background(), c.P(0)); err == nil {
+		return JsonOk(c)
+	} else {
+		return JsonError(c, err)
+	}
+}
+
 type ConfigPutResult struct {
 	Revision int64 `json:"revision"`
 }
