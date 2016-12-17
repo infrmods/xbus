@@ -89,7 +89,11 @@ func (cmd *ListPerm) Execute(_ context.Context, f *flag.FlagSet, v ...interface{
 	if cmd.prefix != "" {
 		prefix = &cmd.prefix
 	}
-	canWrite = &cmd.canWrite
+	f.Visit(func(x *flag.Flag) {
+		if x.Name == "write" {
+			canWrite = &cmd.canWrite
+		}
+	})
 	if perms, err := app_ctrl.GetPerms(typ, appName, groupName, canWrite, prefix); err == nil {
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		fmt.Fprintf(w, "id\ttype\ttarget_type\ttarget\twrite\tcontent\tcreate_time\n")
