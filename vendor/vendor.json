@@ -87,16 +87,16 @@
 			"revisionTime": "2016-03-22T08:31:58Z"
 		},
 		{
-			"checksumSHA1": "NimvQlWKtJzidCzEQSU5LpfCH6I=",
+			"checksumSHA1": "1TawpEK2F/gsfsOPFsPqbLJOfM0=",
 			"path": "github.com/gocomm/dbutil",
-			"revision": "9cc7692519cc2c3bab5a76421fc9408e8892ae30",
-			"revisionTime": "2016-07-18T14:22:43Z"
+			"revision": "af0f0d480834f1b910703fd0f58ad76adad002a9",
+			"revisionTime": "2016-12-18T08:32:09Z"
 		},
 		{
 			"checksumSHA1": "dJ3riA4z2KuYi3rN/TBpd2fwdQU=",
 			"path": "github.com/gocomm/dbutil/dialects/mysql",
-			"revision": "23013e47b0e057ca980af7e0df871c3bbb17ce82",
-			"revisionTime": "2016-06-05T07:50:16Z"
+			"revision": "af0f0d480834f1b910703fd0f58ad76adad002a9",
+			"revisionTime": "2016-12-18T08:32:09Z"
 		},
 		{
 			"checksumSHA1": "iZVulPMFFGC70xeLZJafiKzTn18=",
