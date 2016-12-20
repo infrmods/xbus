@@ -116,7 +116,7 @@ type ConfigPutResult struct {
 func (server *APIServer) PutConfig(c echo.Context) error {
 	value := c.FormValue("value")
 	if value == "" {
-		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid value")
+		return JsonErrorf(c, utils.EcodeInvalidValue, "invalid value")
 	}
 	version, ok, err := IntFormParamD(c, "version", 0)
 	if !ok {
