@@ -101,7 +101,7 @@ func (ctrl *ConfigCtrl) Delete(ctx context.Context, name string) error {
 	if err := ctrl.deleteDBConfig(name); err != nil {
 		return err
 	}
-	if _, err := ctrl.etcdClient.Delete(ctx, name); err != nil {
+	if _, err := ctrl.etcdClient.Delete(ctx, ctrl.configKey(name)); err != nil {
 		return utils.CleanErr(err, "", "delete config(%s) fail: %v", name, err)
 	}
 	return nil
