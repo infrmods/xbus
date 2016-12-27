@@ -53,9 +53,9 @@ func (cmd *ListPerm) Execute(_ context.Context, f *flag.FlagSet, v ...interface{
 		glog.Errorf("get apps fail: %v", err)
 		return subcommands.ExitFailure
 	}
-	app_map := make(map[int64]*apps.App)
+	app_map := make(map[int64]apps.App)
 	for _, app := range app_list {
-		app_map[app.Id] = &app
+		app_map[app.Id] = app
 	}
 	group_list, err := apps.GetGroupList(db)
 	if err != nil {
@@ -117,8 +117,7 @@ func (cmd *ListPerm) Execute(_ context.Context, f *flag.FlagSet, v ...interface{
 					target = "<public>"
 				} else {
 					target_type_name = "app"
-					app := app_map[perm.TargetId]
-					if app == nil {
+					if app, exists := app_map[perm.TargetId]; !exists {
 						target = fmt.Sprintf("<invalid: %d>", perm.TargetId)
 					} else {
 						target = fmt.Sprintf("%s[%d]", app.Name, app.Id)
