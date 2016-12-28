@@ -82,7 +82,7 @@ func (server *APIServer) GetAllConfigs(c echo.Context) error {
 		if ok, err := server.checkPerm(c, apps.PermTypeConfig, false, key); err != nil {
 			return JsonError(c, err)
 		} else if !ok {
-			return JsonError(c, ErrNotPermitted)
+			return JsonError(c, newNotPermittedErr(key))
 		}
 	}
 

@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/tls"
+	"fmt"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/facebookgo/httpdown"
 	"github.com/golang/glog"
@@ -136,7 +137,9 @@ func (server *APIServer) appId(c echo.Context) int64 {
 	return 0
 }
 
-var ErrNotPermitted = utils.NewError(utils.EcodeNotPermitted, "not permitted")
+func newNotPermittedErr(name string) *utils.Error {
+	return utils.NewError(utils.EcodeNotPermitted, fmt.Sprintf("not permitted: %s", name))
+}
 
 func (server *APIServer) checkPerm(c echo.Context, permType int, needWrite bool, name string) (bool, error) {
 	app := c.Get("app").(*apps.App)
@@ -170,7 +173,7 @@ func (server *APIServer) newPermChecker(permType int, needWrite bool) echo.Middl
 		return echo.HandlerFunc(func(c echo.Context) error {
 			if ok, err := server.checkPerm(c, permType, needWrite, c.P(0)); err == nil {
 				if !ok {
-					return JsonError(c, ErrNotPermitted)
+					return JsonError(c, newNotPermittedErr(c.P(0)))
 				}
 			} else {
 				return JsonError(c, err)
