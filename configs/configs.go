@@ -77,6 +77,9 @@ func (ctrl *ConfigCtrl) ListDBConfigs(ctx context.Context,
 		return 0, nil, utils.NewSystemError("get configs count fail")
 	}
 	if items, err := ListDBConfigs(ctrl.db, prefix, skip, limit); err == nil {
+		if items == nil {
+			items = make([]ConfigInfo, 0)
+		}
 		return count, items, nil
 	} else {
 		glog.Errorf("get db configs fail: %v", err)
