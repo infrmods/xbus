@@ -11,7 +11,7 @@ import (
 )
 
 type ListResult struct {
-	Total   int64    `json:"tatal"`
+	Total   int64    `json:"total"`
 	Configs []string `json:"configs"`
 	Skip    int      `json:"skip"`
 	Limit   int      `json:"limit"`
