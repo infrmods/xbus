@@ -11,6 +11,7 @@ import (
 )
 
 type ListResult struct {
+	Total   int64    `json:"tatal"`
 	Configs []string `json:"configs"`
 	Skip    int      `json:"skip"`
 	Limit   int      `json:"limit"`
@@ -22,14 +23,6 @@ func (server *APIServer) ListConfig(c echo.Context) error {
 	}
 
 	prefix := c.QueryParam("prefix")
-	if ok, err := server.checkPerm(c, apps.PermTypeConfig, false, prefix); err == nil {
-		if !ok {
-			return JsonErrorf(c, utils.EcodeNotPermitted, "not permitted")
-		}
-	} else {
-		return JsonError(c, err)
-	}
-
 	skip, ok, err := IntQueryParamD(c, "skip", 0)
 	if !ok {
 		return err
@@ -39,8 +32,9 @@ func (server *APIServer) ListConfig(c echo.Context) error {
 		return err
 	}
 
-	if configs, err := server.configs.ListDBConfigs(context.Background(), prefix, int(skip), int(limit)); err == nil {
-		return JsonResult(c, ListResult{Configs: configs, Skip: int(skip), Limit: int(limit)})
+	if total, configs, err := server.configs.ListDBConfigs(context.Background(), prefix, int(skip), int(limit)); err == nil {
+		return JsonResult(c,
+			ListResult{Total: total, Configs: configs, Skip: int(skip), Limit: int(limit)})
 	} else {
 		return JsonError(c, err)
 	}

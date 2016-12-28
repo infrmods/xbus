@@ -22,6 +22,19 @@ type DBConfigItem struct {
 	ModifyTime time.Time `json:"modify_time"`
 }
 
+func GetDBConfigCount(db *sql.DB, prefix string) (int64, error) {
+	var count int64
+	var err error
+	q := `select count(*) from configs`
+	if prefix == "" {
+		err = dbutil.Query(db, &count, q)
+	} else {
+		err = dbutil.Query(db, &count, q+` where name like ?`, prefix+"%")
+	}
+
+	return count, err
+}
+
 func ListDBConfigs(db *sql.DB, prefix string, skip, limit int) ([]string, error) {
 	args := make([]interface{}, 0, 3)
 	q := `select name from configs where status=?`

@@ -69,12 +69,17 @@ func (ctrl *ConfigCtrl) Range(ctx context.Context, from, end string, sortOption 
 	}
 }
 
-func (ctrl *ConfigCtrl) ListDBConfigs(ctx context.Context, prefix string, skip, limit int) ([]string, error) {
+func (ctrl *ConfigCtrl) ListDBConfigs(ctx context.Context, prefix string, skip, limit int) (int64, []string, error) {
+	count, err := GetDBConfigCount(ctrl.db, prefix)
+	if err != nil {
+		glog.Errorf("get db configs(prefix: %s) fail: %v", prefix, err)
+		return 0, nil, utils.NewSystemError("get configs count fail")
+	}
 	if items, err := ListDBConfigs(ctrl.db, prefix, skip, limit); err == nil {
-		return items, nil
+		return count, items, nil
 	} else {
 		glog.Errorf("get db configs fail: %v", err)
-		return nil, utils.NewSystemError("get configs fail")
+		return 0, nil, utils.NewSystemError("get configs fail")
 	}
 }
 
