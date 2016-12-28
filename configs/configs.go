@@ -69,7 +69,8 @@ func (ctrl *ConfigCtrl) Range(ctx context.Context, from, end string, sortOption 
 	}
 }
 
-func (ctrl *ConfigCtrl) ListDBConfigs(ctx context.Context, prefix string, skip, limit int) (int64, []string, error) {
+func (ctrl *ConfigCtrl) ListDBConfigs(ctx context.Context,
+	prefix string, skip, limit int) (int64, []ConfigInfo, error) {
 	count, err := GetDBConfigCount(ctrl.db, prefix)
 	if err != nil {
 		glog.Errorf("get db configs(prefix: %s) fail: %v", prefix, err)

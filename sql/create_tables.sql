@@ -98,6 +98,7 @@ CREATE TABLE `config_items` (
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `configs` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `status` tinyint(4) NOT NULL,
   `name` varchar(64) NOT NULL,
   `value` text NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -25,19 +25,24 @@ type DBConfigItem struct {
 func GetDBConfigCount(db *sql.DB, prefix string) (int64, error) {
 	var count int64
 	var err error
-	q := `select count(*) from configs`
+	q := `select count(*) from configs where status=?`
 	if prefix == "" {
-		err = dbutil.Query(db, &count, q)
+		err = dbutil.Query(db, &count, q, ConfigStatusOk)
 	} else {
-		err = dbutil.Query(db, &count, q+` where name like ?`, prefix+"%")
+		err = dbutil.Query(db, &count, q+` and name like ?`, ConfigStatusOk, prefix+"%")
 	}
 
 	return count, err
 }
 
-func ListDBConfigs(db *sql.DB, prefix string, skip, limit int) ([]string, error) {
+type ConfigInfo struct {
+	Name       string    `json:"name"`
+	ModifyTime time.Time `json:"modify_time"`
+}
+
+func ListDBConfigs(db *sql.DB, prefix string, skip, limit int) ([]ConfigInfo, error) {
 	args := make([]interface{}, 0, 3)
-	q := `select name from configs where status=?`
+	q := `select name,modify_time from configs where status=?`
 	args = append(args, ConfigStatusOk)
 	if prefix != "" {
 		q += ` and name like ?`
@@ -47,7 +52,7 @@ func ListDBConfigs(db *sql.DB, prefix string, skip, limit int) ([]string, error)
 	args = append(args, skip)
 	args = append(args, limit)
 
-	var items []string
+	var items []ConfigInfo
 	if err := dbutil.Query(db, &items, q, args...); err == nil {
 		return items, nil
 	} else {

@@ -11,10 +11,10 @@ import (
 )
 
 type ListResult struct {
-	Total   int64    `json:"total"`
-	Configs []string `json:"configs"`
-	Skip    int      `json:"skip"`
-	Limit   int      `json:"limit"`
+	Total   int64                `json:"total"`
+	Configs []configs.ConfigInfo `json:"configs"`
+	Skip    int                  `json:"skip"`
+	Limit   int                  `json:"limit"`
 }
 
 func (server *APIServer) ListConfig(c echo.Context) error {
