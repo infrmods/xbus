@@ -73,7 +73,7 @@ func (server *APIServer) PlugAllService(c echo.Context) error {
 	for _, desc := range desces {
 		if ok, err := server.checkPerm(c, apps.PermTypeService, true, desc.Name); err == nil {
 			if !ok {
-				return utils.Errorf(utils.EcodeNotPermitted, "not permitted: %s", desc.Name)
+				return JsonErrorf(c, utils.EcodeNotPermitted, "not permitted: %s", desc.Name)
 			}
 		} else {
 			return JsonError(c, err)
