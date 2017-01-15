@@ -49,7 +49,7 @@ type Service struct {
 
 type Config struct {
 	KeyPrefix        string `default:"/services" yaml:"key_prefix"`
-	PermitChangeDesc bool   `default:false yaml:"permit_change_desc"`
+	PermitChangeDesc bool   `default:"false" yaml:"permit_change_desc"`
 }
 
 type ServiceCtrl struct {
