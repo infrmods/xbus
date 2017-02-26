@@ -1,6 +1,6 @@
--- MySQL dump 10.16  Distrib 10.1.14-MariaDB, for Linux (x86_64)
+-- MySQL dump 10.16  Distrib 10.1.21-MariaDB, for Linux (x86_64)
 --
--- Host: localhost    Database: xbus
+-- Host: localhost    Database: localhost
 -- ------------------------------------------------------
 -- Server version	5.7.12
 
@@ -98,7 +98,7 @@ CREATE TABLE `config_items` (
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `configs` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `status` tinyint(4) NOT NULL,
+  `status` tinyint(4) NOT NULL DEFAULT '0',
   `name` varchar(64) NOT NULL,
   `value` text NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -170,4 +170,4 @@ CREATE TABLE `perms` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-07-17 20:59:33
+-- Dump completed on 2017-02-26 21:32:19
