@@ -97,7 +97,8 @@ func (ctrl *ServiceCtrl) ensureServiceDesc(ctx context.Context, name, version, v
 							return utils.CleanErr(err, "put service-desc fail", "put service-desc fail: %v", err)
 						}
 					}
-					return utils.NewError(utils.EcodeChangedServiceDesc, "service-desc can't be change")
+					return utils.Errorf(utils.EcodeChangedServiceDesc,
+						"service-desc[%s:%s] can't be change", name, version)
 				}
 			}
 			glog.Errorf("ensureServiceDesc fail, get invalid response: %v", resp)
