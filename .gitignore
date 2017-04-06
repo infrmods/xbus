@@ -26,4 +26,5 @@ _testmain.go
 *.test
 *.prof
 *.pem
-*.ks
+*.jks
+*.yml

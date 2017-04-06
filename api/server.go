@@ -13,14 +13,13 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/engine/standard"
 	"github.com/labstack/echo/middleware"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 )
 
-const (
-	ConfigPublicInfix = ".public."
-)
+type IPNet net.IPNet
 
 type Config struct {
 	Listen      string        `default:"127.0.0.1:4433"`
@@ -30,6 +29,25 @@ type Config struct {
 	KillTimeout time.Duration `default:"20s" yaml:"kill_timeout"`
 
 	PermitPublicServiceQuery bool `default:"true"`
+	DevNets                  []IPNet
+}
+
+func (ipnet *IPNet) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var str string
+	if err := unmarshal(&str); err != nil {
+		return err
+	}
+	if str == "" {
+		return fmt.Errorf("empty ipnet")
+	}
+
+	if _, result, err := net.ParseCIDR(str); err == nil {
+		ipnet.IP = result.IP
+		ipnet.Mask = result.Mask
+		return nil
+	} else {
+		return err
+	}
 }
 
 type APIServer struct {
@@ -103,29 +121,47 @@ func (server *APIServer) Start() error {
 
 func (server *APIServer) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 	return echo.HandlerFunc(func(c echo.Context) error {
+		var appName string
 		req := c.Request().(*standard.Request).Request
-		var app *apps.App
-		var groupIds []int64
 		if server.tls {
 			if req.TLS != nil && len(req.TLS.PeerCertificates) > 0 {
-				cn := req.TLS.PeerCertificates[0].Subject.CommonName
-				if cn != "" {
-					var err error
-					app, groupIds, err = server.apps.GetAppGroupByName(cn)
-					if err != nil {
-						glog.Errorf("get app(%s) fail: %v", cn, err)
-						return JsonErrorC(c, http.StatusServiceUnavailable,
-							utils.Errorf(utils.EcodeSystemError, "get app fail"))
-					} else if app == nil {
-						glog.V(1).Infof("no such app: %s", cn)
+				appName = req.TLS.PeerCertificates[0].Subject.CommonName
+			} else if server.config.DevNets != nil {
+				if devApp := req.Header.Get("DEV-APP"); devApp != "" {
+					if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+						if ip := net.ParseIP(host); ip != nil {
+							for _, ipnet := range server.config.DevNets {
+								if (*net.IPNet)(&ipnet).Contains(ip) {
+									appName = devApp
+									break
+								}
+							}
+						} else {
+							glog.Warningf("invalid remote ip: %v", host)
+						}
+					} else {
+						glog.Warningf("invalid remote addr: %v", req.RemoteAddr)
 					}
 				}
 			}
 		} else {
 			// TODO: http request sign verify
 		}
-		c.Set("app", app)
-		c.Set("groupIds", groupIds)
+
+		c.Set("app", (*apps.App)(nil))
+		c.Set("groupIds", []int64{})
+		if appName != "" {
+			if app, groupIds, err := server.apps.GetAppGroupByName(appName); err != nil {
+				glog.Errorf("get app(%s) fail: %v", appName, err)
+				return JsonErrorC(c, http.StatusServiceUnavailable,
+					utils.Errorf(utils.EcodeSystemError, "get app fail"))
+			} else if app == nil {
+				glog.V(1).Infof("no such app: %s", appName)
+			} else {
+				c.Set("app", app)
+				c.Set("groupIds", groupIds)
+			}
+		}
 		return h(c)
 	})
 }
