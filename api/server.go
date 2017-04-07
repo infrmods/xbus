@@ -127,7 +127,7 @@ func (server *APIServer) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 			if req.TLS != nil && len(req.TLS.PeerCertificates) > 0 {
 				appName = req.TLS.PeerCertificates[0].Subject.CommonName
 			} else if server.config.DevNets != nil {
-				if devApp := req.Header.Get("DEV-APP"); devApp != "" {
+				if devApp := req.Header.Get("Dev-App"); devApp != "" {
 					if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
 						if ip := net.ParseIP(host); ip != nil {
 							for _, ipnet := range server.config.DevNets {
