@@ -16,34 +16,61 @@ const (
 type DBConfigItem struct {
 	Id         int64     `json:"id"`
 	Status     int       `json:"-"`
+	Tag        string    `json:"tag"`
 	Name       string    `json:"name"`
 	Value      string    `json:"value"`
 	CreateTime time.Time `json:"create_time"`
 	ModifyTime time.Time `json:"modify_time"`
 }
 
-func GetDBConfigCount(db *sql.DB, prefix string) (int64, error) {
-	var count int64
-	var err error
-	q := `select count(*) from configs where status=?`
-	if prefix == "" {
-		err = dbutil.Query(db, &count, q, ConfigStatusOk)
+func GetDBConfig(db *sql.DB, name string) (*DBConfigItem, error) {
+	var item DBConfigItem
+	if err := dbutil.Query(db, &item, `select * from configs where
+			status=? and name=?`, ConfigStatusOk, name); err == nil {
+		return &item, nil
+	} else if err == sql.ErrNoRows {
+		return nil, nil
 	} else {
-		err = dbutil.Query(db, &count, q+` and name like ?`, ConfigStatusOk, prefix+"%")
+		return nil, err
+	}
+}
+
+func GetDBConfigCount(db *sql.DB, tag, prefix string) (int64, error) {
+	args := make([]interface{}, 0, 3)
+	q := `select count(*) from configs where status=?`
+	args = append(args, ConfigStatusOk)
+
+	if tag != "" {
+		q += ` and tag = ?`
+		args = append(args, tag)
+	}
+	if prefix != "" {
+		q += ` and name like ?`
+		args = append(args, prefix+"%")
 	}
 
-	return count, err
+	var count int64
+	if err := dbutil.Query(db, &count, q, args...); err == nil {
+		return count, nil
+	} else {
+		return 0, err
+	}
 }
 
 type ConfigInfo struct {
+	Tag        *string   `json:"tag"`
 	Name       string    `json:"name"`
 	ModifyTime time.Time `json:"modify_time"`
 }
 
-func ListDBConfigs(db *sql.DB, prefix string, skip, limit int) ([]ConfigInfo, error) {
+func ListDBConfigs(db *sql.DB, tag, prefix string, skip, limit int) ([]ConfigInfo, error) {
 	args := make([]interface{}, 0, 3)
-	q := `select name,modify_time from configs where status=?`
+	q := `select tag,name,modify_time from configs where status=?`
 	args = append(args, ConfigStatusOk)
+	if tag != "" {
+		q += ` and tag = ?`
+		args = append(args, tag)
+	}
 	if prefix != "" {
 		q += ` and name like ?`
 		args = append(args, prefix+"%")
@@ -62,13 +89,14 @@ func ListDBConfigs(db *sql.DB, prefix string, skip, limit int) ([]ConfigInfo, er
 
 type ConfigHistory struct {
 	Id         int64     `json:"id"`
+	Tag        string    `json:"tag"`
 	Name       string    `json:"name"`
 	AppId      int64     `json:"modified_by"`
 	Value      string    `json:"value"`
 	CreateTime time.Time `json:"create_time"`
 }
 
-func (ctrl *ConfigCtrl) setDBConfig(name string, appId int64, value string) (rerr error) {
+func (ctrl *ConfigCtrl) setDBConfig(tag, name string, appId int64, value string) (rerr error) {
 	tx, err := ctrl.db.Begin()
 	if err != nil {
 		glog.Errorf("new db tx fail: %v", err)
@@ -83,15 +111,15 @@ func (ctrl *ConfigCtrl) setDBConfig(name string, appId int64, value string) (rer
 		}
 	}()
 
-	if _, err := tx.Exec(`insert into configs(status,name,value,create_time,modify_time)
-                          values(?,?,?,now(),now())
-                          on duplicate key update status=?, value=?, modify_time=now()`,
-		ConfigStatusOk, name, value, ConfigStatusOk, value); err != nil {
+	if _, err := tx.Exec(`insert into configs(status,tag,name,value,create_time,modify_time)
+                          values(?,?,?,?,now(),now())
+                          on duplicate key update status=?, tag=?, value=?, modify_time=now()`,
+		ConfigStatusOk, tag, name, value, ConfigStatusOk, tag, value); err != nil {
 		glog.Errorf("insert db config(%s) fail: %v", name, err)
 		return utils.NewError(utils.EcodeSystemError, "update db config fail")
 	}
-	if _, err := tx.Exec(`insert into config_histories(name,app_id,value,create_time)
-                          values(?,?,?,now())`, name, appId, value); err != nil {
+	if _, err := tx.Exec(`insert into config_histories(tag, name,app_id,value,create_time)
+                          values(?,?,?,?,now())`, tag, name, appId, value); err != nil {
 		glog.Errorf("insert db config history fail: %v", err)
 		return utils.NewError(utils.EcodeSystemError, "insert db config history fail")
 	}

@@ -22,6 +22,7 @@ func (server *APIServer) ListConfig(c echo.Context) error {
 		return server.GetAllConfigs(c)
 	}
 
+	tag := c.QueryParam("tag")
 	prefix := c.QueryParam("prefix")
 	skip, ok, err := IntQueryParamD(c, "skip", 0)
 	if !ok {
@@ -32,7 +33,7 @@ func (server *APIServer) ListConfig(c echo.Context) error {
 		return err
 	}
 
-	if total, configs, err := server.configs.ListDBConfigs(context.Background(), prefix, int(skip), int(limit)); err == nil {
+	if total, configs, err := server.configs.ListDBConfigs(context.Background(), tag, prefix, int(skip), int(limit)); err == nil {
 		return JsonResult(c,
 			ListResult{Total: total, Configs: configs, Skip: int(skip), Limit: int(limit)})
 	} else {
@@ -108,6 +109,7 @@ type ConfigPutResult struct {
 }
 
 func (server *APIServer) PutConfig(c echo.Context) error {
+	tag := c.FormValue("tag")
 	value := c.FormValue("value")
 	if value == "" {
 		return JsonErrorf(c, utils.EcodeInvalidValue, "invalid value")
@@ -117,7 +119,7 @@ func (server *APIServer) PutConfig(c echo.Context) error {
 		return err
 	}
 
-	if rev, err := server.configs.Put(context.Background(), c.P(0), server.appId(c), value, version); err == nil {
+	if rev, err := server.configs.Put(context.Background(), tag, c.P(0), server.appId(c), value, version); err == nil {
 		return JsonResult(c, ConfigPutResult{Revision: rev})
 	} else {
 		return JsonError(c, err)

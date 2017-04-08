@@ -70,13 +70,13 @@ func (ctrl *ConfigCtrl) Range(ctx context.Context, from, end string, sortOption 
 }
 
 func (ctrl *ConfigCtrl) ListDBConfigs(ctx context.Context,
-	prefix string, skip, limit int) (int64, []ConfigInfo, error) {
-	count, err := GetDBConfigCount(ctrl.db, prefix)
+	tag, prefix string, skip, limit int) (int64, []ConfigInfo, error) {
+	count, err := GetDBConfigCount(ctrl.db, tag, prefix)
 	if err != nil {
 		glog.Errorf("get db configs(prefix: %s) fail: %v", prefix, err)
 		return 0, nil, utils.NewSystemError("get configs count fail")
 	}
-	if items, err := ListDBConfigs(ctrl.db, prefix, skip, limit); err == nil {
+	if items, err := ListDBConfigs(ctrl.db, tag, prefix, skip, limit); err == nil {
 		if items == nil {
 			items = make([]ConfigInfo, 0)
 		}
@@ -122,14 +122,14 @@ func configFromKv(name string, kv *mvccpb.KeyValue) ConfigItem {
 		Version: kv.Version}
 }
 
-func (ctrl *ConfigCtrl) Put(ctx context.Context, name string, appId int64, value string, version int64) (int64, error) {
+func (ctrl *ConfigCtrl) Put(ctx context.Context, tag, name string, appId int64, value string, version int64) (int64, error) {
 	if err := checkName(name); err != nil {
 		return 0, err
 	}
 	key := ctrl.configKey(name)
 	if version < 0 {
 		if resp, err := ctrl.etcdClient.Put(ctx, key, value); err == nil {
-			if err := ctrl.setDBConfig(name, appId, value); err != nil {
+			if err := ctrl.setDBConfig(tag, name, appId, value); err != nil {
 				return 0, err
 			}
 			return resp.Header.Revision, nil
@@ -144,7 +144,7 @@ func (ctrl *ConfigCtrl) Put(ctx context.Context, name string, appId int64, value
 		} else if !resp.Succeeded {
 			return 0, utils.NewError(utils.EcodeInvalidVersion, "")
 		} else {
-			if err := ctrl.setDBConfig(name, appId, value); err != nil {
+			if err := ctrl.setDBConfig(tag, name, appId, value); err != nil {
 				return 0, err
 			}
 			return resp.Header.Revision, nil
