@@ -63,6 +63,7 @@ CREATE TABLE `apps` (
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `config_histories` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `tag` varchar(32) DEFAULT NULL,
   `name` varchar(64) NOT NULL,
   `app_id` bigint(20) NOT NULL,
   `value` text NOT NULL,
@@ -99,12 +100,14 @@ CREATE TABLE `config_items` (
 CREATE TABLE `configs` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `status` tinyint(4) NOT NULL DEFAULT '0',
+  `tag` varchar(32) DEFAULT NULL,
   `name` varchar(64) NOT NULL,
   `value` text NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name_uniq` (`name`)
+  UNIQUE KEY `name_uniq` (`name`),
+  KEY `tag_name` (`tag`,`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -170,4 +173,4 @@ CREATE TABLE `perms` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2017-02-26 21:32:19
+-- Dump completed on 2017-04-08 21:57:07
