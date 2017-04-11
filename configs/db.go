@@ -111,15 +111,21 @@ func (ctrl *ConfigCtrl) setDBConfig(tag, name string, appId int64, value string)
 		}
 	}()
 
+	var tagV sql.NullString
+	if tag != "" {
+		tagV.Valid = true
+		tagV.String = tag
+	}
+
 	if _, err := tx.Exec(`insert into configs(status,tag,name,value,create_time,modify_time)
                           values(?,?,?,?,now(),now())
                           on duplicate key update status=?, tag=?, value=?, modify_time=now()`,
-		ConfigStatusOk, tag, name, value, ConfigStatusOk, tag, value); err != nil {
+		ConfigStatusOk, tagV, name, value, ConfigStatusOk, tagV, value); err != nil {
 		glog.Errorf("insert db config(%s) fail: %v", name, err)
 		return utils.NewError(utils.EcodeSystemError, "update db config fail")
 	}
 	if _, err := tx.Exec(`insert into config_histories(tag, name,app_id,value,create_time)
-                          values(?,?,?,?,now())`, tag, name, appId, value); err != nil {
+                          values(?,?,?,?,now())`, tagV, name, appId, value); err != nil {
 		glog.Errorf("insert db config history fail: %v", err)
 		return utils.NewError(utils.EcodeSystemError, "insert db config history fail")
 	}
