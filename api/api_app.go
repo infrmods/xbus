@@ -2,7 +2,6 @@ package api
 
 import (
 	"github.com/infrmods/xbus/apps"
-	"github.com/infrmods/xbus/utils"
 	"github.com/labstack/echo"
 )
 
@@ -23,7 +22,7 @@ type ListAppResult struct {
 func (server *APIServer) ListApp(c echo.Context) error {
 	if ok, err := server.checkPerm(c, apps.PermTypeApp, false, ""); err == nil {
 		if !ok {
-			return JsonErrorf(c, utils.EcodeNotPermitted, "not permitted")
+			return JsonError(c, newNotPermittedErr(server.appName(c), "app perm"))
 		}
 	} else {
 		return err
