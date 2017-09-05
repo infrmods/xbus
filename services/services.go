@@ -2,10 +2,12 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
 	"golang.org/x/net/context"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -48,8 +50,31 @@ type Service struct {
 }
 
 type Config struct {
-	KeyPrefix        string `default:"/services" yaml:"key_prefix"`
-	PermitChangeDesc bool   `default:"false" yaml:"permit_change_desc"`
+	KeyPrefix               string   `default:"/services" yaml:"key_prefix"`
+	PermitChangeDesc        bool     `default:"false" yaml:"permit_change_desc"`
+	BannedEndpointAddresses []string `yaml:"banned_endpoint_addresses"`
+	bannedAddrRs            []*regexp.Regexp
+}
+
+func (config *Config) prepareBanned() error {
+	config.bannedAddrRs = make([]*regexp.Regexp, 0, len(config.BannedEndpointAddresses))
+	for _, addr := range config.BannedEndpointAddresses {
+		if r, err := regexp.Compile(addr); err == nil {
+			config.bannedAddrRs = append(config.bannedAddrRs, r)
+		} else {
+			return fmt.Errorf("invalid banned address: %s", addr)
+		}
+	}
+	return nil
+}
+
+func (config *Config) isAddressBanned(addr string) bool {
+	for _, r := range config.bannedAddrRs {
+		if r.MatchString(addr) {
+			return true
+		}
+	}
+	return false
 }
 
 type ServiceCtrl struct {
@@ -57,12 +82,16 @@ type ServiceCtrl struct {
 	etcdClient *clientv3.Client
 }
 
-func NewServiceCtrl(config *Config, etcdClient *clientv3.Client) *ServiceCtrl {
+func NewServiceCtrl(config *Config, etcdClient *clientv3.Client) (*ServiceCtrl, error) {
+	if err := config.prepareBanned(); err != nil {
+		return nil, err
+	}
+	glog.Infof("%#v", *config)
 	services := &ServiceCtrl{config: *config, etcdClient: etcdClient}
 	if strings.HasSuffix(services.config.KeyPrefix, "/") {
 		services.config.KeyPrefix = services.config.KeyPrefix[:len(services.config.KeyPrefix)-1]
 	}
-	return services
+	return services, nil
 }
 
 func checkDesc(desc *ServiceDesc) error {
@@ -84,7 +113,7 @@ func (ctrl *ServiceCtrl) Plug(ctx context.Context,
 	if endpoint.Address == "" {
 		return 0, utils.NewError(utils.EcodeInvalidEndpoint, "missing address")
 	}
-	if err := checkAddress(endpoint.Address); err != nil {
+	if err := ctrl.checkAddress(endpoint.Address); err != nil {
 		return 0, err
 	}
 
@@ -104,7 +133,7 @@ func (ctrl *ServiceCtrl) Unplug(ctx context.Context, name, version, addr string)
 	if err := checkNameVersion(name, version); err != nil {
 		return err
 	}
-	if err := checkAddress(addr); err != nil {
+	if err := ctrl.checkAddress(addr); err != nil {
 		return err
 	}
 	if _, err := ctrl.etcdClient.Delete(ctx, ctrl.serviceKey(name, version, addr)); err != nil {
@@ -120,7 +149,7 @@ func (ctrl *ServiceCtrl) PlugAllService(ctx context.Context,
 	if endpoint.Address == "" {
 		return 0, utils.NewError(utils.EcodeInvalidEndpoint, "missing address")
 	}
-	if err := checkAddress(endpoint.Address); err != nil {
+	if err := ctrl.checkAddress(endpoint.Address); err != nil {
 		return 0, err
 	}
 	endpoint_data, err := endpoint.Marshal()
@@ -162,7 +191,7 @@ func (ctrl *ServiceCtrl) Update(ctx context.Context, name, version, addr string,
 	if err := checkNameVersion(name, version); err != nil {
 		return err
 	}
-	if err := checkAddress(addr); err != nil {
+	if err := ctrl.checkAddress(addr); err != nil {
 		return err
 	}
 	key := ctrl.serviceKey(name, version, addr)

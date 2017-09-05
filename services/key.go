@@ -32,9 +32,12 @@ func checkNameVersion(name, version string) error {
 
 var rValidAddress = regexp.MustCompile(`(?i)^[a-z0-9:_.-]+$`)
 
-func checkAddress(addr string) error {
+func (ctrl *ServiceCtrl) checkAddress(addr string) error {
 	if !rValidAddress.MatchString(addr) {
 		return utils.NewError(utils.EcodeInvalidAddress, "")
+	}
+	if ctrl.config.isAddressBanned(addr) {
+		return utils.NewError(utils.EcodeInvalidAddress, "banned")
 	}
 	return nil
 }
