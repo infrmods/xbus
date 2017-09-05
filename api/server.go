@@ -173,8 +173,15 @@ func (server *APIServer) appId(c echo.Context) int64 {
 	return 0
 }
 
-func newNotPermittedErr(name string) *utils.Error {
-	return utils.NewError(utils.EcodeNotPermitted, fmt.Sprintf("not permitted: %s", name))
+func (server *APIServer) appName(c echo.Context) string {
+	if x := c.Get("app").(*apps.App); x != nil {
+		return x.Name
+	}
+	return "null"
+}
+
+func newNotPermittedErr(app, name string) *utils.Error {
+	return utils.NewError(utils.EcodeNotPermitted, fmt.Sprintf("not permitted: [%s] %s", app, name))
 }
 
 func (server *APIServer) checkPerm(c echo.Context, permType int, needWrite bool, name string) (bool, error) {
@@ -209,7 +216,7 @@ func (server *APIServer) newPermChecker(permType int, needWrite bool) echo.Middl
 		return echo.HandlerFunc(func(c echo.Context) error {
 			if ok, err := server.checkPerm(c, permType, needWrite, c.P(0)); err == nil {
 				if !ok {
-					return JsonError(c, newNotPermittedErr(c.P(0)))
+					return JsonError(c, newNotPermittedErr(server.appName(c), c.P(0)))
 				}
 			} else {
 				return JsonError(c, err)
