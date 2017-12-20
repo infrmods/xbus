@@ -271,7 +271,7 @@ func (ctrl *ServiceCtrl) Watch(ctx context.Context, name, version string,
 	}
 
 	resp := <-watchCh
-	if !resp.Canceled {
+	if !resp.Canceled && resp.Header.Revision > 0 {
 		return ctrl.query(ctx, name, version)
 	}
 	return nil, 0, nil
