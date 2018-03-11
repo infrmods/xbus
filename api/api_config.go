@@ -73,12 +73,16 @@ func (server *APIServer) GetAllConfigs(c echo.Context) error {
 	if err := json.Unmarshal([]byte(ks), &keys); err != nil {
 		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid keys: %v", err)
 	}
+	not_permitted := make([]string, 0)
 	for _, key := range keys {
 		if ok, err := server.checkPerm(c, apps.PermTypeConfig, false, key); err != nil {
 			return JsonError(c, err)
 		} else if !ok {
-			return JsonError(c, newNotPermittedErr(server.appName(c), key))
+			not_permitted = append(not_permitted, key)
 		}
+	}
+	if len(not_permitted) != 0 {
+		return server.newNotPermittedResp(c, not_permitted...)
 	}
 
 	node := c.Request().Header().Get("node")

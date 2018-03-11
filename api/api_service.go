@@ -70,14 +70,18 @@ func (server *APIServer) PlugAllService(c echo.Context) error {
 	if ok, err := JsonFormParam(c, "desces", &desces); !ok {
 		return err
 	}
+	not_permitted := make([]string, 0)
 	for _, desc := range desces {
 		if ok, err := server.checkPerm(c, apps.PermTypeService, true, desc.Name); err == nil {
 			if !ok {
-				return JsonError(c, newNotPermittedErr(server.appName(c), desc.Name))
+				not_permitted = append(not_permitted, desc.Name)
 			}
 		} else {
 			return JsonError(c, err)
 		}
+	}
+	if len(not_permitted) > 0 {
+		return server.newNotPermittedResp(c, not_permitted...)
 	}
 
 	var endpoint services.ServiceEndpoint

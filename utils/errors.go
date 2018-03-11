@@ -25,16 +25,17 @@ const (
 )
 
 type Error struct {
-	Code    string `json:"code"`
-	Message string `json:"message,omitempty"`
+	Code             string   `json:"code"`
+	Message          string   `json:"message,omitempty"`
+	NotPermittedKeys []string `json:"not_permitted_keys,omitempty"`
 }
 
 func NewError(code string, message string) *Error {
-	return &Error{Code: code, Message: message}
+	return &Error{Code: code, Message: message, NotPermittedKeys: nil}
 }
 
 func Errorf(code, format string, args ...interface{}) *Error {
-	return &Error{Code: code, Message: fmt.Sprintf(format, args...)}
+	return &Error{Code: code, Message: fmt.Sprintf(format, args...), NotPermittedKeys: nil}
 }
 
 func (e *Error) Error() string {
@@ -45,9 +46,17 @@ func (e *Error) Error() string {
 }
 
 func NewSystemError(msg string) *Error {
-	return &Error{Code: EcodeSystemError, Message: msg}
+	return &Error{Code: EcodeSystemError, Message: msg, NotPermittedKeys: nil}
 }
 
 func SystemErrorf(format string, args ...interface{}) *Error {
-	return &Error{Code: EcodeSystemError, Message: fmt.Sprintf(format, args...)}
+	return &Error{Code: EcodeSystemError, Message: fmt.Sprintf(format, args...), NotPermittedKeys: nil}
+}
+
+func NewNotPermittedError(msg string, keys []string) *Error {
+	return &Error{
+		Code:             EcodeNotPermitted,
+		Message:          msg,
+		NotPermittedKeys: keys,
+	}
 }

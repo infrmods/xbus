@@ -22,7 +22,7 @@ type ListAppResult struct {
 func (server *APIServer) ListApp(c echo.Context) error {
 	if ok, err := server.checkPerm(c, apps.PermTypeApp, false, ""); err == nil {
 		if !ok {
-			return JsonError(c, newNotPermittedErr(server.appName(c), "app perm"))
+			return server.newNotPermittedResp(c, "app perm")
 		}
 	} else {
 		return err

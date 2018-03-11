@@ -9,6 +9,29 @@ import (
 	"strconv"
 )
 
+type LeaseGrantResult struct {
+	TTL     int64            `json:"ttl"`
+	LeaseId clientv3.LeaseID `json:"lease_id"`
+}
+
+func (server *APIServer) GrantLease(c echo.Context) error {
+	ttl, ok, err := IntFormParamD(c, "ttl", 60)
+	if !ok {
+		return err
+	}
+	if ttl > 0 && ttl < MinServiceTTL {
+		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
+	}
+	if rep, err := server.etcdClient.Grant(context.Background(), ttl); err == nil {
+		return JsonResult(c, LeaseGrantResult{
+			TTL:     rep.TTL,
+			LeaseId: rep.ID,
+		})
+	} else {
+		return JsonError(c, utils.CleanErr(err, "grant lease fail", "grant lease(ttl: %d) fail: %v", ttl, err))
+	}
+}
+
 func parseLeaseId(s string) (clientv3.LeaseID, error) {
 	if n, err := strconv.ParseInt(s, 10, 64); err == nil {
 		return clientv3.LeaseID(n), nil
