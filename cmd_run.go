@@ -33,7 +33,7 @@ func (cmd *RunCommand) Execute(_ context.Context, f *flag.FlagSet, _ ...interfac
 	x := NewXBus()
 	db := x.NewDB()
 	etcdClient := x.NewEtcdClient()
-	services, err := services.NewServiceCtrl(&x.Config.Services, etcdClient)
+	services, err := services.NewServiceCtrl(&x.Config.Services, db, etcdClient)
 	if err != nil {
 		glog.Errorf("create service fail: %v", err)
 		os.Exit(-1)

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/coreos/etcd/clientv3"
@@ -79,15 +80,16 @@ func (config *Config) isAddressBanned(addr string) bool {
 
 type ServiceCtrl struct {
 	config     Config
+	db         *sql.DB
 	etcdClient *clientv3.Client
 }
 
-func NewServiceCtrl(config *Config, etcdClient *clientv3.Client) (*ServiceCtrl, error) {
+func NewServiceCtrl(config *Config, db *sql.DB, etcdClient *clientv3.Client) (*ServiceCtrl, error) {
 	if err := config.prepareBanned(); err != nil {
 		return nil, err
 	}
 	glog.Infof("%#v", *config)
-	services := &ServiceCtrl{config: *config, etcdClient: etcdClient}
+	services := &ServiceCtrl{config: *config, db: db, etcdClient: etcdClient}
 	if strings.HasSuffix(services.config.KeyPrefix, "/") {
 		services.config.KeyPrefix = services.config.KeyPrefix[:len(services.config.KeyPrefix)-1]
 	}

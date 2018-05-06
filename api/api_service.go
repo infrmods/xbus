@@ -122,6 +122,10 @@ func (server *APIServer) UpdateService(c echo.Context) error {
 	return JsonOk(c)
 }
 
+func (server *APIServer) SearchService(c echo.Context) error {
+	return nil
+}
+
 type ServiceQueryResult struct {
 	Service  *services.Service `json:"service"`
 	Revision int64             `json:"revision"`

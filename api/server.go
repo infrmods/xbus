@@ -235,6 +235,7 @@ func (server *APIServer) registerServiceAPIs(g *echo.Group) {
 	g.Post("", echo.HandlerFunc(server.PlugAllService))
 	g.Put("/:name/:version/:id", echo.HandlerFunc(server.UpdateService),
 		server.newPermChecker(apps.PermTypeService, true))
+	g.Get("", echo.HandlerFunc(server.SearchService))
 
 	if server.config.PermitPublicServiceQuery {
 		g.Get("/:name/:version", echo.HandlerFunc(server.QueryService))
