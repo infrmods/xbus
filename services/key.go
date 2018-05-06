@@ -66,51 +66,12 @@ const MAX_NEW_UNIQUE_TRY = 3
 
 func (ctrl *ServiceCtrl) ensureServiceDesc(ctx context.Context, name, version, value string) error {
 	key := ctrl.serviceDescKey(name, version)
-	for i := 0; i < MAX_NEW_UNIQUE_TRY; i++ {
-		txn := ctrl.etcdClient.Txn(ctx).If(
-			clientv3.Compare(clientv3.Value(key), "=", value),
-		).Then().Else(clientv3.OpGet(key))
-
-		if resp, err := txn.Commit(); err == nil {
-			if resp.Succeeded {
-				return nil
-			}
-			if len(resp.Responses) == 1 {
-				if rangeResp := resp.Responses[0].GetResponseRange(); rangeResp != nil {
-					if len(rangeResp.Kvs) == 0 || ctrl.config.PermitChangeDesc {
-						var ver int64 = 0
-						if len(rangeResp.Kvs) > 0 {
-							for _, k := range rangeResp.Kvs {
-								if string(k.Key) == key {
-									ver = k.Version
-									break
-								}
-							}
-							glog.V(1).Infof("changed desc: %s:%s", name, version)
-						}
-						txn := ctrl.etcdClient.Txn(ctx).If(
-							clientv3.Compare(clientv3.Version(key), "=", ver),
-						).Then(clientv3.OpPut(key, value))
-						if resp, err := txn.Commit(); err == nil {
-							if resp.Succeeded {
-								return nil
-							}
-							continue
-						} else {
-							return utils.CleanErr(err, "put service-desc fail", "put service-desc fail: %v", err)
-						}
-					}
-					return utils.Errorf(utils.EcodeChangedServiceDesc,
-						"service-desc[%s:%s] can't be change", name, version)
-				}
-			}
-			glog.Errorf("ensureServiceDesc fail, get invalid response: %v", resp)
-			return utils.NewSystemError("unexpected old service-desc")
-		} else {
-			return utils.CleanErr(err, "put service-desc fail", "exec service-desc check txn fail: %v", err)
-		}
+	txn := ctrl.etcdClient.Txn(ctx).If(
+		clientv3.Compare(clientv3.Value(key), "=", value)).Then().Else(clientv3.OpPut(key, value))
+	if _, err := txn.Commit(); err != nil {
+		return utils.CleanErr(err, "put service-desc fail", "exec service-desc txn fail: %v", err)
 	}
-	return utils.NewError(utils.EcodeTooManyAttempts, "put service-desc fail: too many attempts")
+	return nil
 }
 
 func (ctrl *ServiceCtrl) setServiceNode(ctx context.Context, ttl time.Duration, leaseId clientv3.LeaseID,
@@ -131,16 +92,16 @@ func (ctrl *ServiceCtrl) setServiceNode(ctx context.Context, ttl time.Duration, 
 		}
 	}
 
-	var err error
+	txn := ctrl.etcdClient.Txn(ctx).If(clientv3.Compare(clientv3.Value(key), "=", value)).Then()
 	if ttl > 0 {
-		_, err = ctrl.etcdClient.Put(ctx, key, value, clientv3.WithLease(leaseId))
+		txn = txn.Else(clientv3.OpPut(key, value, clientv3.WithLease(leaseId)))
 	} else {
-		_, err = ctrl.etcdClient.Put(ctx, key, value)
+		txn = txn.Else(clientv3.OpPut(key, value))
 	}
 
-	if err != nil {
-		return 0, utils.CleanErr(err, "create unique key fail",
-			"Txn(create unique key(%s)) fail: %v", key, err)
+	if _, err := txn.Commit(); err != nil {
+		return 0, utils.CleanErr(err, "plug service fail",
+			"put service(%s) node fail: %v", key, err)
 	}
 	return leaseId, nil
 }

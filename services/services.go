@@ -124,6 +124,9 @@ func (ctrl *ServiceCtrl) Plug(ctx context.Context,
 	if err != nil {
 		return 0, err
 	}
+	if err := ctrl.updateServices([]ServiceDesc{*desc}); err != nil {
+		return 0, err
+	}
 	if err := ctrl.ensureServiceDesc(ctx, desc.Name, desc.Version, string(desc_data)); err != nil {
 		return 0, err
 	}
@@ -159,6 +162,9 @@ func (ctrl *ServiceCtrl) PlugAllService(ctx context.Context,
 		return 0, err
 	}
 
+	if err := ctrl.updateServices(desces); err != nil {
+		return 0, err
+	}
 	for _, desc := range desces {
 		if err := checkDesc(&desc); err != nil {
 			return 0, err

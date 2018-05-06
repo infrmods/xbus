@@ -123,7 +123,19 @@ func (server *APIServer) UpdateService(c echo.Context) error {
 }
 
 func (server *APIServer) SearchService(c echo.Context) error {
-	return nil
+	skip, ok, err := IntQueryParamD(c, "skip", 0)
+	if !ok {
+		return err
+	}
+	limit, ok, err := IntQueryParamD(c, "limit", 200)
+	if !ok {
+		return err
+	}
+	if result, err := server.services.SearchService(c.QueryParam("q"), skip, limit); err == nil {
+		return JsonResult(c, result)
+	} else {
+		return JsonError(c, err)
+	}
 }
 
 type ServiceQueryResult struct {

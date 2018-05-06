@@ -1,8 +1,8 @@
--- MySQL dump 10.16  Distrib 10.1.21-MariaDB, for Linux (x86_64)
+-- MySQL dump 10.16  Distrib 10.1.32-MariaDB, for Linux (x86_64)
 --
--- Host: localhost    Database: localhost
+-- Host: 127.0.0.1    Database: xbus
 -- ------------------------------------------------------
--- Server version	5.7.12
+-- Server version	5.7.16
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -28,11 +28,11 @@ CREATE TABLE `app_config_states` (
   `config_name` varchar(64) NOT NULL,
   `version` bigint(20) NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `app_config_uniq` (`config_name`,`app_id`,`app_node`),
-  KEY `app_node_state_key` (`app_id`,`app_node`,`config_name`),
-  KEY `app_config_state_key` (`app_id`,`config_name`)
+  UNIQUE KEY `app_config_uniq` (`config_name`,`app_id`,`app_node`) USING BTREE,
+  KEY `app_node_state_key` (`app_id`,`app_node`,`config_name`) USING BTREE,
+  KEY `app_config_state_key` (`app_id`,`config_name`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -49,9 +49,9 @@ CREATE TABLE `apps` (
   `description` varchar(512) NOT NULL,
   `cert` varchar(4096) NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name_UNIQUE` (`name`)
+  UNIQUE KEY `name_UNIQUE` (`name`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -69,7 +69,7 @@ CREATE TABLE `config_histories` (
   `value` text NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `name_key` (`name`)
+  KEY `name_key` (`name`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -85,9 +85,9 @@ CREATE TABLE `config_items` (
   `value` varchar(1024) NOT NULL,
   `ver` int(10) unsigned NOT NULL DEFAULT '0',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name_UNIQUE` (`name`)
+  UNIQUE KEY `name_UNIQUE` (`name`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -104,9 +104,9 @@ CREATE TABLE `configs` (
   `name` varchar(64) NOT NULL,
   `value` text NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name_uniq` (`name`),
+  UNIQUE KEY `name_uniq` (`name`) USING BTREE,
   KEY `tag_name` (`tag`,`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -123,7 +123,7 @@ CREATE TABLE `group_members` (
   `group_id` bigint(20) NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `app_group_uniq` (`app_id`,`group_id`)
+  UNIQUE KEY `app_group_uniq` (`app_id`,`group_id`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -139,9 +139,9 @@ CREATE TABLE `groups` (
   `name` varchar(64) NOT NULL,
   `description` varchar(512) NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name_UNIQUE` (`name`)
+  UNIQUE KEY `name_UNIQUE` (`name`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -160,8 +160,29 @@ CREATE TABLE `perms` (
   `content` varchar(128) NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `target_uniq` (`perm_type`,`target_type`,`target_id`,`content`)
+  UNIQUE KEY `target_uniq` (`perm_type`,`target_type`,`target_id`,`content`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `services`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `services` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `status` tinyint(4) NOT NULL,
+  `name` varchar(256) NOT NULL,
+  `version` varchar(32) NOT NULL,
+  `typ` varchar(16) NOT NULL,
+  `proto` text NOT NULL,
+  `description` text NOT NULL,
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `nv_dup` (`name`,`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -173,4 +194,4 @@ CREATE TABLE `perms` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2017-04-08 21:57:07
+-- Dump completed on 2018-05-06 22:48:47
