@@ -87,11 +87,16 @@ func (ctrl *ServiceCtrl) setServiceNode(ctx context.Context, ttl time.Duration, 
 					}
 				}
 			}()
+			if _, err := ctrl.etcdClient.Put(ctx, key, value, clientv3.WithLease(leaseId)); err == nil {
+				return leaseId, nil
+			}
+			return 0, utils.CleanErr(err, "put service node fail", "put service node fail: %v", err)
 		} else {
 			return 0, utils.CleanErr(err, "create lease fail", "create lease fail: %v", err)
 		}
 	}
 
+	glog.Infof("--set node: %s %d", key, leaseId)
 	txn := ctrl.etcdClient.Txn(ctx).If(clientv3.Compare(clientv3.Value(key), "=", value)).Then()
 	if ttl > 0 {
 		txn = txn.Else(clientv3.OpPut(key, value, clientv3.WithLease(leaseId)))
@@ -99,9 +104,18 @@ func (ctrl *ServiceCtrl) setServiceNode(ctx context.Context, ttl time.Duration, 
 		txn = txn.Else(clientv3.OpPut(key, value))
 	}
 
-	if _, err := txn.Commit(); err != nil {
+	if resp, err := txn.Commit(); err == nil {
+		if resp.Succeeded {
+			glog.Infof("--node not changed")
+			if _, err := ctrl.etcdClient.KeepAliveOnce(ctx, leaseId); err != nil {
+				return 0, utils.CleanErr(err, "keepalive fail", "keepalive(%d) fail: %v", leaseId, err)
+			}
+		} else {
+			glog.Infof("--node changed")
+		}
+		return leaseId, nil
+	} else {
 		return 0, utils.CleanErr(err, "plug service fail",
 			"put service(%s) node fail: %v", key, err)
 	}
-	return leaseId, nil
 }
