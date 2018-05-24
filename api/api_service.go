@@ -182,9 +182,6 @@ func (server *APIServer) WatchService(c echo.Context) error {
 
 	if service, rev, err := server.services.Watch(ctx,
 		c.P(0), c.P(1), revision); err == nil {
-		if service == nil {
-			return JsonErrorf(c, utils.EcodeDeadlineExceeded, "timeout")
-		}
 		return JsonResult(c, ServiceQueryResult{Service: service, Revision: rev})
 	} else {
 		return JsonError(c, err)

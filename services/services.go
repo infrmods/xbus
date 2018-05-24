@@ -278,9 +278,6 @@ func (ctrl *ServiceCtrl) Watch(ctx context.Context, name, version string,
 		watchCh = watcher.Watch(ctx, key, clientv3.WithPrefix())
 	}
 
-	resp := <-watchCh
-	if !resp.Canceled && resp.Header.Revision > 0 {
-		return ctrl.query(ctx, name, version)
-	}
-	return nil, 0, nil
+	_ = <-watchCh
+	return ctrl.query(ctx, name, version)
 }
