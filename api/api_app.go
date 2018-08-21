@@ -1,7 +1,9 @@
 package api
 
 import (
+	"github.com/golang/glog"
 	"github.com/infrmods/xbus/apps"
+	"github.com/infrmods/xbus/utils"
 	"github.com/labstack/echo"
 )
 
@@ -39,6 +41,42 @@ func (server *APIServer) ListApp(c echo.Context) error {
 	if apps, err := server.apps.ListApp(int(skip), int(limit)); err == nil {
 		return JsonResult(c, ListAppResult{Apps: apps, Skip: int(skip), Limit: int(limit)})
 	} else {
+		return JsonError(c, err)
+	}
+}
+
+type NewAppRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	KeyBits     int    `json:"key_bits"`
+	Days        int    `json:"days"`
+}
+
+func (server *APIServer) NewApp(c echo.Context) error {
+	if ok, err := server.checkPerm(c, apps.PermTypeApp, false, ""); err == nil {
+		if !ok {
+			return server.newNotPermittedResp(c, "app perm")
+		}
+	} else {
+		return err
+	}
+	var req NewAppRequest
+	if err := c.Bind(&req); err != nil {
+		return err
+	}
+	privKey, err := utils.NewPrivateKey("", req.KeyBits)
+	if err != nil {
+		glog.Errorf("generate private key fail: %v", err)
+		return JsonErrorf(c, "SYSTEM_BUSY", "create private key fail")
+	}
+	app := apps.App{
+		Status:      utils.StatusOk,
+		Name:        req.Name,
+		Description: req.Description}
+	if _, err := server.apps.NewApp(&app, privKey, nil, nil, req.Days); err == nil {
+		return JsonResult(c, app)
+	} else {
+		glog.Errorf("create app fail: %v", err)
 		return JsonError(c, err)
 	}
 }

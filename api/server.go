@@ -126,6 +126,7 @@ func (server *APIServer) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 		if server.tls {
 			if req.TLS != nil && len(req.TLS.PeerCertificates) > 0 {
 				appName = req.TLS.PeerCertificates[0].Subject.CommonName
+				c.Set("tlsAppName", appName)
 			} else if server.config.DevNets != nil {
 				if devApp := req.Header.Get("Dev-App"); devApp != "" {
 					if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
@@ -267,4 +268,5 @@ func (server *APIServer) registerConfigAPIs(g *echo.Group) {
 func (server *APIServer) registerAppAPIs(g *echo.Group) {
 	g.Get("/:name/cert", echo.HandlerFunc(server.GetAppCert))
 	g.Get("", echo.HandlerFunc(server.ListApp))
+	g.Put("", echo.HandlerFunc(server.NewApp))
 }

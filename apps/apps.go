@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"net"
 	"regexp"
+	"strings"
 )
 
 var SERIAL_CONFIG_ITEM = "cert_serial"
@@ -90,32 +91,40 @@ func (ctrl *AppCtrl) GetAppCertPool() *x509.CertPool {
 
 var rAppName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-_]+$`)
 
-func (ctrl *AppCtrl) NewApp(app *App, pk crypto.PublicKey, dnsNames []string, ips []net.IP, days int) (privKey crypto.Signer, err error) {
+func (ctrl *AppCtrl) NewApp(app *App, key crypto.Signer, dnsNames []string, ips []net.IP, days int) (crypto.Signer, error) {
 	if !rAppName.MatchString(app.Name) {
 		return nil, utils.Errorf(utils.EcodeInvalidName, "invalid app name: %s", app.Name)
 	}
-	for _, name := range []string{"public", "global", "app", "xbus"} {
-		if app.Name == name {
+	lowerName := strings.ToLower(app.Name)
+	for _, name := range []string{"public", "global", "app", "xbus", "null", "unknown"} {
+		if lowerName == name {
 			return nil, utils.Errorf(utils.EcodeInvalidName, "reserved name: %s", app.Name)
 		}
 	}
 
-	if pk == nil {
-		privKey, err = utils.NewPrivateKey(ctrl.config.EcdsaCruve, ctrl.config.RSABits)
+	var err error
+	if key == nil {
+		key, err = utils.NewPrivateKey(ctrl.config.EcdsaCruve, ctrl.config.RSABits)
 		if err != nil {
 			glog.Errorf("generate key fail: %v", err)
 			return nil, utils.NewSystemError("generate key fail")
 		}
-		pk = privKey.Public()
 	}
 
 	name := pkix.Name{CommonName: app.Name,
 		Organization: []string{ctrl.config.Organization}}
-	if certPem, err := ctrl.CertsManager.NewCert(pk, name, dnsNames, ips, days); err == nil {
+	if certPem, err := ctrl.CertsManager.NewCert(key.Public(), name, dnsNames, ips, days); err == nil {
 		app.Cert = string(certPem)
 	} else {
 		glog.Errorf("generate cert fail: %v", err)
 		return nil, utils.NewSystemError("generate cert fail")
+	}
+
+	if data, err := utils.EncodePrivateKeyToPem(key); err == nil {
+		app.PrivateKey = data
+	} else {
+		glog.Errorf("encode private key to pem fail: {}", err)
+		return nil, utils.NewSystemError("encode private key pem fail")
 	}
 
 	if err := InsertApp(ctrl.db, app); err != nil {
@@ -126,7 +135,7 @@ func (ctrl *AppCtrl) NewApp(app *App, pk crypto.PublicKey, dnsNames []string, ip
 		glog.Errorf("insert app(%s) fail: %v", app.Name, err)
 		return nil, utils.NewSystemError("create app fail")
 	}
-	return
+	return key, nil
 }
 
 func (ctrl *AppCtrl) GetPerms(typ int, app_name *string, group_name *string, can_write *bool, prefix *string) ([]Perm, error) {

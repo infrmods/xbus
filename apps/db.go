@@ -15,6 +15,7 @@ type App struct {
 	Status      int       `json:"status"`
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
+	PrivateKey  string    `json:"-"`
 	Cert        string    `json:"cert"`
 	CreateTime  time.Time `json:"create_time"`
 	ModifyTime  time.Time `json:"modify_time"`
@@ -48,8 +49,8 @@ func ListApp(db *sql.DB, skip, limit int) ([]App, error) {
 
 func InsertApp(db *sql.DB, app *App) error {
 	if id, err := dbutil.Insert(db,
-		`insert ignore into apps(status, name, description, cert)
-         values(?, ?, ?, ?)`, app.Status, app.Name, app.Description, app.Cert); err == nil {
+		`insert ignore into apps(status, name, description, private_key, cert)
+         values(?, ?, ?, ?, ?)`, app.Status, app.Name, app.Description, app.PrivateKey, app.Cert); err == nil {
 		app.Id = id
 		return nil
 	} else {

@@ -83,7 +83,7 @@ func (cmd *NewAppCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface
 	appCtrl := x.NewAppCtrl(x.NewDB())
 	app := apps.App{Status: utils.StatusOk, Name: appName,
 		Description: cmd.Description}
-	if _, err := appCtrl.NewApp(&app, privKey.Public(), strings.Split(cmd.DNSNames, ","), ips, cmd.Days); err != nil {
+	if _, err := appCtrl.NewApp(&app, privKey, strings.Split(cmd.DNSNames, ","), ips, cmd.Days); err != nil {
 		glog.Errorf("create app fail: %v", err)
 		return subcommands.ExitFailure
 	}

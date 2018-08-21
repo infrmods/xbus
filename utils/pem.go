@@ -21,6 +21,26 @@ func WritePem(path string, perm os.FileMode, typ string, data []byte) error {
 	return err
 }
 
+func EncodeToPem(typ string, data []byte) string {
+	block := pem.Block{Type: typ, Bytes: data}
+	return (string)(pem.EncodeToMemory(&block))
+}
+
+func EncodePrivateKeyToPem(key crypto.Signer) (string, error) {
+	switch k := key.(type) {
+	case *rsa.PrivateKey:
+		return EncodeToPem("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(k)), nil
+	case *ecdsa.PrivateKey:
+		data, err := x509.MarshalECPrivateKey(k)
+		if err != nil {
+			return "", err
+		}
+		return EncodeToPem("EC PRIVATE KEY", data), nil
+	default:
+		return "", fmt.Errorf("unknown private key: %v", key)
+	}
+}
+
 func WritePrivateKey(path string, perm os.FileMode, key crypto.Signer) error {
 	switch k := key.(type) {
 	case *rsa.PrivateKey:
