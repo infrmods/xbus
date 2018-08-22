@@ -46,10 +46,10 @@ func (server *APIServer) ListApp(c echo.Context) error {
 }
 
 type NewAppRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	KeyBits     int    `json:"key_bits"`
-	Days        int    `json:"days"`
+	Name        string `json:"name" form:"name"`
+	Description string `json:"description" form:"description"`
+	KeyBits     int    `json:"key_bits" form:"key_bits"`
+	Days        int    `json:"days" form:"days"`
 }
 
 func (server *APIServer) NewApp(c echo.Context) error {
