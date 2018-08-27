@@ -92,11 +92,12 @@ type ConfigHistory struct {
 	Tag        string    `json:"tag"`
 	Name       string    `json:"name"`
 	AppId      int64     `json:"modified_by"`
+	Remark     string    `json:"remark"`
 	Value      string    `json:"value"`
 	CreateTime time.Time `json:"create_time"`
 }
 
-func (ctrl *ConfigCtrl) setDBConfig(tag, name string, appId int64, value string) (rerr error) {
+func (ctrl *ConfigCtrl) setDBConfig(tag, name string, appId int64, remark, value string) (rerr error) {
 	tx, err := ctrl.db.Begin()
 	if err != nil {
 		glog.Errorf("new db tx fail: %v", err)
@@ -124,8 +125,8 @@ func (ctrl *ConfigCtrl) setDBConfig(tag, name string, appId int64, value string)
 		glog.Errorf("insert db config(%s) fail: %v", name, err)
 		return utils.NewError(utils.EcodeSystemError, "update db config fail")
 	}
-	if _, err := tx.Exec(`insert into config_histories(tag, name,app_id,value,create_time)
-                          values(?,?,?,?,now())`, tagV, name, appId, value); err != nil {
+	if _, err := tx.Exec(`insert into config_histories(tag, name,app_id,remark,value,create_time)
+                          values(?,?,?,?,?,now())`, tagV, name, appId, remark, value); err != nil {
 		glog.Errorf("insert db config history fail: %v", err)
 		return utils.NewError(utils.EcodeSystemError, "insert db config history fail")
 	}

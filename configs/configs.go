@@ -122,14 +122,14 @@ func configFromKv(name string, kv *mvccpb.KeyValue) ConfigItem {
 		Version: kv.Version}
 }
 
-func (ctrl *ConfigCtrl) Put(ctx context.Context, tag, name string, appId int64, value string, version int64) (int64, error) {
+func (ctrl *ConfigCtrl) Put(ctx context.Context, tag, name string, appId int64, remark, value string, version int64) (int64, error) {
 	if err := checkName(name); err != nil {
 		return 0, err
 	}
 	key := ctrl.configKey(name)
 	if version < 0 {
 		if resp, err := ctrl.etcdClient.Put(ctx, key, value); err == nil {
-			if err := ctrl.setDBConfig(tag, name, appId, value); err != nil {
+			if err := ctrl.setDBConfig(tag, name, appId, remark, value); err != nil {
 				return 0, err
 			}
 			return resp.Header.Revision, nil
@@ -144,7 +144,7 @@ func (ctrl *ConfigCtrl) Put(ctx context.Context, tag, name string, appId int64, 
 		} else if !resp.Succeeded {
 			return 0, utils.NewError(utils.EcodeInvalidVersion, "")
 		} else {
-			if err := ctrl.setDBConfig(tag, name, appId, value); err != nil {
+			if err := ctrl.setDBConfig(tag, name, appId, remark, value); err != nil {
 				return 0, err
 			}
 			return resp.Header.Revision, nil

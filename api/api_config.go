@@ -122,8 +122,9 @@ func (server *APIServer) PutConfig(c echo.Context) error {
 	if !ok {
 		return err
 	}
+	remark := c.FormValue("remark")
 
-	if rev, err := server.configs.Put(context.Background(), tag, c.P(0), server.appId(c), value, version); err == nil {
+	if rev, err := server.configs.Put(context.Background(), tag, c.P(0), server.appId(c), remark, value, version); err == nil {
 		return JsonResult(c, ConfigPutResult{Revision: rev})
 	} else {
 		return JsonError(c, err)

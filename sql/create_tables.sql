@@ -67,6 +67,7 @@ CREATE TABLE `config_histories` (
   `tag` varchar(32) DEFAULT NULL,
   `name` varchar(64) NOT NULL,
   `app_id` bigint(20) NOT NULL,
+  `info` varchar(128) DEFAULT NULL,
   `value` text NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
