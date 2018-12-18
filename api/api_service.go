@@ -148,6 +148,7 @@ func (server *APIServer) QueryService(c echo.Context) error {
 		return server.WatchService(c)
 	}
 	if service, rev, err := server.services.Query(context.Background(),
+		server.getRemoteIp(c),
 		c.P(0), c.P(1)); err == nil {
 		return JsonResult(c, ServiceQueryResult{Service: service, Revision: rev})
 	} else {
@@ -161,7 +162,9 @@ type AllServiceQueryResult struct {
 }
 
 func (server *APIServer) QueryServiceAllVersions(c echo.Context) error {
-	if services, rev, err := server.services.QueryAllVersions(context.Background(), c.P(0)); err == nil {
+	if services, rev, err := server.services.QueryAllVersions(context.Background(),
+		server.getRemoteIp(c),
+		c.P(0)); err == nil {
 		return JsonResult(c, AllServiceQueryResult{Services: services, Revision: rev})
 	} else {
 		return JsonError(c, err)
@@ -181,6 +184,7 @@ func (server *APIServer) WatchService(c echo.Context) error {
 	defer cancelFunc()
 
 	if service, rev, err := server.services.Watch(ctx,
+		server.getRemoteIp(c),
 		c.P(0), c.P(1), revision); err == nil {
 		return JsonResult(c, ServiceQueryResult{Service: service, Revision: rev})
 	} else {

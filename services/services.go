@@ -8,6 +8,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
 	"golang.org/x/net/context"
+	"net"
 	"regexp"
 	"strings"
 	"time"
@@ -50,20 +51,38 @@ type Service struct {
 	ServiceDesc
 }
 
+type NetMapping struct {
+	SrcNet string `yaml:"src_net"`
+	DestIp string `yaml:"dest_ip"`
+	srcNet *net.IPNet
+}
+
 type Config struct {
-	KeyPrefix               string   `default:"/services" yaml:"key_prefix"`
-	PermitChangeDesc        bool     `default:"false" yaml:"permit_change_desc"`
-	BannedEndpointAddresses []string `yaml:"banned_endpoint_addresses"`
+	KeyPrefix               string       `default:"/services" yaml:"key_prefix"`
+	PermitChangeDesc        bool         `default:"false" yaml:"permit_change_desc"`
+	NetMappings             []NetMapping `yaml:"net_mappings"`
+	BannedEndpointAddresses []string     `yaml:"banned_endpoint_addresses"`
 	bannedAddrRs            []*regexp.Regexp
 }
 
-func (config *Config) prepareBanned() error {
+func (config *Config) prepare() error {
 	config.bannedAddrRs = make([]*regexp.Regexp, 0, len(config.BannedEndpointAddresses))
 	for _, addr := range config.BannedEndpointAddresses {
 		if r, err := regexp.Compile(addr); err == nil {
 			config.bannedAddrRs = append(config.bannedAddrRs, r)
 		} else {
 			return fmt.Errorf("invalid banned address: %s", addr)
+		}
+	}
+	for i, _ := range config.NetMappings {
+		mapping := &config.NetMappings[i]
+		if _, srcNet, err := net.ParseCIDR(mapping.SrcNet); err == nil {
+			mapping.srcNet = srcNet
+		} else {
+			return fmt.Errorf("invalid SrcNet: %s", mapping.SrcNet)
+		}
+		if ip := net.ParseIP(mapping.DestIp); ip == nil {
+			return fmt.Errorf("invalid DestIp: %s", mapping.DestIp)
 		}
 	}
 	return nil
@@ -78,6 +97,21 @@ func (config *Config) isAddressBanned(addr string) bool {
 	return false
 }
 
+func (config *Config) mapAddress(addr string, clientIp net.IP) string {
+	if clientIp != nil {
+		if host, port, err := net.SplitHostPort(addr); err == nil {
+			if ip := net.ParseIP(host); ip != nil {
+				for _, mapping := range config.NetMappings {
+					if mapping.srcNet.Contains(ip) && !mapping.srcNet.Contains(clientIp) {
+						return net.JoinHostPort(mapping.DestIp, port)
+					}
+				}
+			}
+		}
+	}
+	return addr
+}
+
 type ServiceCtrl struct {
 	config     Config
 	db         *sql.DB
@@ -85,7 +119,7 @@ type ServiceCtrl struct {
 }
 
 func NewServiceCtrl(config *Config, db *sql.DB, etcdClient *clientv3.Client) (*ServiceCtrl, error) {
-	if err := config.prepareBanned(); err != nil {
+	if err := config.prepare(); err != nil {
 		return nil, err
 	}
 	glog.Infof("%#v", *config)
@@ -223,20 +257,20 @@ func (ctrl *ServiceCtrl) Update(ctx context.Context, name, version, addr string,
 	}
 }
 
-func (ctrl *ServiceCtrl) Query(ctx context.Context, name, version string) (*Service, int64, error) {
+func (ctrl *ServiceCtrl) Query(ctx context.Context, clientIp net.IP, name, version string) (*Service, int64, error) {
 	if err := checkNameVersion(name, version); err != nil {
 		return nil, 0, err
 	}
-	return ctrl.query(ctx, name, version)
+	return ctrl.query(ctx, clientIp, name, version)
 }
 
-func (ctrl *ServiceCtrl) QueryAllVersions(ctx context.Context, name string) (map[string]*Service, int64, error) {
+func (ctrl *ServiceCtrl) QueryAllVersions(ctx context.Context, clientIp net.IP, name string) (map[string]*Service, int64, error) {
 	if err := checkName(name); err != nil {
 		return nil, 0, err
 	}
 	key := ctrl.serviceEntryPrefix(name)
 	if resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix()); err == nil {
-		if services, err := ctrl.makeAllService(name, resp.Kvs); err == nil {
+		if services, err := ctrl.makeAllService(clientIp, name, resp.Kvs); err == nil {
 			return services, resp.Header.Revision, nil
 		} else {
 			return nil, 0, err
@@ -246,13 +280,13 @@ func (ctrl *ServiceCtrl) QueryAllVersions(ctx context.Context, name string) (map
 	}
 }
 
-func (ctrl *ServiceCtrl) query(ctx context.Context, name, version string) (*Service, int64, error) {
+func (ctrl *ServiceCtrl) query(ctx context.Context, clientIp net.IP, name, version string) (*Service, int64, error) {
 	key := ctrl.serviceKeyPrefix(name, version)
 	if resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix()); err == nil {
 		if len(resp.Kvs) == 0 {
 			return nil, 0, utils.Errorf(utils.EcodeNotFound, "no such service: %s:%s", name, version)
 		}
-		if service, err := ctrl.makeService(name, version, resp.Kvs); err == nil {
+		if service, err := ctrl.makeService(clientIp, name, version, resp.Kvs); err == nil {
 			return service, resp.Header.Revision, nil
 		} else {
 			return nil, 0, err
@@ -262,7 +296,7 @@ func (ctrl *ServiceCtrl) query(ctx context.Context, name, version string) (*Serv
 	}
 }
 
-func (ctrl *ServiceCtrl) Watch(ctx context.Context, name, version string,
+func (ctrl *ServiceCtrl) Watch(ctx context.Context, clientIp net.IP, name, version string,
 	revision int64) (*Service, int64, error) {
 	if err := checkNameVersion(name, version); err != nil {
 		return nil, 0, err
@@ -279,5 +313,5 @@ func (ctrl *ServiceCtrl) Watch(ctx context.Context, name, version string,
 	}
 
 	_ = <-watchCh
-	return ctrl.query(ctx, name, version)
+	return ctrl.query(ctx, clientIp, name, version)
 }

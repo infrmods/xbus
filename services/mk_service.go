@@ -5,10 +5,11 @@ import (
 	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
+	"net"
 	"strings"
 )
 
-func (ctrl *ServiceCtrl) makeService(name, version string, kvs []*mvccpb.KeyValue) (*Service, error) {
+func (ctrl *ServiceCtrl) makeService(clientIp net.IP, name, version string, kvs []*mvccpb.KeyValue) (*Service, error) {
 	var service Service
 	service.Name = name
 	service.Version = version
@@ -23,6 +24,7 @@ func (ctrl *ServiceCtrl) makeService(name, version string, kvs []*mvccpb.KeyValu
 				glog.Errorf("unmarshal endpoint fail(%#v): %v", string(kv.Value), err)
 				return nil, utils.NewError(utils.EcodeDamagedEndpointValue, "")
 			}
+			endpoint.Address = ctrl.config.mapAddress(endpoint.Address, clientIp)
 			service.Endpoints = append(service.Endpoints, endpoint)
 		} else if strings.HasPrefix(name, serviceDescNodeKey) {
 			if err := json.Unmarshal(kv.Value, &service.ServiceDesc); err != nil {
@@ -34,7 +36,7 @@ func (ctrl *ServiceCtrl) makeService(name, version string, kvs []*mvccpb.KeyValu
 	return &service, nil
 }
 
-func (ctrl *ServiceCtrl) makeAllService(name string, kvs []*mvccpb.KeyValue) (map[string]*Service, error) {
+func (ctrl *ServiceCtrl) makeAllService(clientIp net.IP, name string, kvs []*mvccpb.KeyValue) (map[string]*Service, error) {
 	mkvs := make(map[string][]*mvccpb.KeyValue)
 	for _, kv := range kvs {
 		parts := strings.Split(string(kv.Key), "/")
@@ -47,7 +49,7 @@ func (ctrl *ServiceCtrl) makeAllService(name string, kvs []*mvccpb.KeyValue) (ma
 
 	services := make(map[string]*Service)
 	for version, subkvs := range mkvs {
-		if service, err := ctrl.makeService(name, version, subkvs); err == nil {
+		if service, err := ctrl.makeService(clientIp, name, version, subkvs); err == nil {
 			services[version] = service
 		} else {
 			return nil, err

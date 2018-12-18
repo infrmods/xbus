@@ -119,6 +119,14 @@ func (server *APIServer) Start() error {
 	return nil
 }
 
+func (server *APIServer) getRemoteIp(c echo.Context) net.IP {
+	req := c.Request().(*standard.Request).Request
+	if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+		return net.ParseIP(host)
+	}
+	return nil
+}
+
 func (server *APIServer) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 	return echo.HandlerFunc(func(c echo.Context) error {
 		var appName string
@@ -129,16 +137,12 @@ func (server *APIServer) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 				c.Set("tlsAppName", appName)
 			} else if server.config.DevNets != nil {
 				if devApp := req.Header.Get("Dev-App"); devApp != "" {
-					if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
-						if ip := net.ParseIP(host); ip != nil {
-							for _, ipnet := range server.config.DevNets {
-								if (*net.IPNet)(&ipnet).Contains(ip) {
-									appName = devApp
-									break
-								}
+					if ip := server.getRemoteIp(c); ip != nil {
+						for _, ipnet := range server.config.DevNets {
+							if (*net.IPNet)(&ipnet).Contains(ip) {
+								appName = devApp
+								break
 							}
-						} else {
-							glog.Warningf("invalid remote ip: %v", host)
 						}
 					} else {
 						glog.Warningf("invalid remote addr: %v", req.RemoteAddr)
