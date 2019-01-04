@@ -30,6 +30,9 @@ func scanSlice(val reflect.Value, rows *sql.Rows) (interface{}, error) {
 		}
 		meta := GetTableMeta(eleType)
 		p, err := meta.PrepareScan(columns)
+		if err != nil {
+			return nil, err
+		}
 		for rows.Next() {
 			v := reflect.New(eleType)
 			fs, err := p.GetScanFields(v.Interface())

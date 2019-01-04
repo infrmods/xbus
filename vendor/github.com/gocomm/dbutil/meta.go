@@ -43,9 +43,10 @@ func (m *TableMeta) GetScanFields(names []string, v interface{}) (fields []inter
 	for _, name := range names {
 		f := m.fieldValues[name]
 		if f == nil {
-			return nil, fmt.Errorf("unknown field(%s) of %v", name, m.Type)
+			fields = append(fields, new(interface{}))
+		} else {
+			fields = append(fields, f(val).Addr().Interface())
 		}
-		fields = append(fields, f(val).Addr().Interface())
 	}
 	return
 }
@@ -67,7 +68,11 @@ func (p *PreparedScan) GetScanFields(v interface{}) (fields []interface{}, err e
 	}
 
 	for _, f := range p.fs {
-		fields = append(fields, f(val).Addr().Interface())
+		if f == nil {
+			fields = append(fields, new(interface{}))
+		} else {
+			fields = append(fields, f(val).Addr().Interface())
+		}
 	}
 	return
 }
@@ -77,9 +82,10 @@ func (m *TableMeta) PrepareScan(names []string) (*PreparedScan, error) {
 	for _, name := range names {
 		f := m.fieldValues[name]
 		if f == nil {
-			return nil, fmt.Errorf("unknown field(%s) of %v", name, m.Type)
+			p.fs = append(p.fs, nil)
+		} else {
+			p.fs = append(p.fs, f)
 		}
-		p.fs = append(p.fs, f)
 	}
 	return p, nil
 }
