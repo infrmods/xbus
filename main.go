@@ -109,6 +109,7 @@ func main() {
 	subcommands.Register(&ListGroupCmd{}, "")
 	subcommands.Register(&ListPerm{}, "")
 	subcommands.Register(&GrantCmd{}, "")
+	subcommands.Register(&KeyCertCmd{}, "")
 
 	flag.Set("logtostderr", "true")
 	flag.Parse()
