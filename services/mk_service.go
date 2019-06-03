@@ -22,11 +22,7 @@ func (ctrl *ServiceCtrl) makeService(clientIP net.IP, serviceKey string, kvs []*
 			glog.Warningf("got unexpected service node: %s", string(kv.Key))
 			continue
 		}
-		service, zone, suffix := matches[0][1], matches[0][2], matches[0][3]
-		if service != serviceKey {
-			glog.Warningf("service mismatch %s != %s", serviceKey, service)
-			continue
-		}
+		_, zone, suffix := matches[0][1], matches[0][2], matches[0][3]
 		serviceZone := zones[zone]
 		if serviceZone == nil {
 			serviceZone = &ServiceZoneV1{Endpoints: make([]ServiceEndpoint, 0)}
