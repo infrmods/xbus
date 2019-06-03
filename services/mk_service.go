@@ -2,58 +2,54 @@ package services
 
 import (
 	"encoding/json"
+	"net"
+	"regexp"
+	"strings"
+
 	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
-	"net"
-	"strings"
 )
 
-func (ctrl *ServiceCtrl) makeService(clientIp net.IP, name, version string, kvs []*mvccpb.KeyValue) (*Service, error) {
-	var service Service
-	service.Name = name
-	service.Version = version
+var rServiceSplit = regexp.MustCompile(`/(.+)/(.+)/(.+)$`)
 
-	service.Endpoints = make([]ServiceEndpoint, 0, len(kvs))
+func (ctrl *ServiceCtrl) makeService(clientIP net.IP, serviceKey string, kvs []*mvccpb.KeyValue) (*ServiceV1, error) {
+	zones := make(map[string]*ServiceZoneV1)
+
 	for _, kv := range kvs {
-		parts := strings.Split(string(kv.Key), "/")
-		name := parts[len(parts)-1]
-		if strings.HasPrefix(name, serviceKeyNodePrefix) {
+		matches := rServiceSplit.FindAllStringSubmatch(string(kv.Key), -1)
+		if len(matches) != 1 {
+			glog.Warningf("got unexpected service node: %s", string(kv.Key))
+			continue
+		}
+		service, zone, suffix := matches[0][1], matches[0][2], matches[0][3]
+		if service != serviceKey {
+			glog.Warningf("service mismatch %s != %s", serviceKey, service)
+			continue
+		}
+		serviceZone := zones[zone]
+		if serviceZone == nil {
+			serviceZone = &ServiceZoneV1{Endpoints: make([]ServiceEndpoint, 0)}
+			zones[zone] = serviceZone
+		}
+		if suffix == serviceDescNodeKey {
+			if err := json.Unmarshal(kv.Value, &serviceZone.ServiceDescV1); err != nil {
+				glog.Errorf("invalid desc(%s), unmarshal fail: %v", string(kv.Key), string(kv.Value))
+				return nil, utils.NewSystemError("service-data damanged")
+			}
+			serviceZone.Service = serviceKey
+			serviceZone.Zone = zone
+		} else if strings.HasPrefix(suffix, serviceKeyNodePrefix) {
 			var endpoint ServiceEndpoint
 			if err := json.Unmarshal(kv.Value, &endpoint); err != nil {
 				glog.Errorf("unmarshal endpoint fail(%#v): %v", string(kv.Value), err)
 				return nil, utils.NewError(utils.EcodeDamagedEndpointValue, "")
 			}
-			endpoint.Address = ctrl.config.mapAddress(endpoint.Address, clientIp)
-			service.Endpoints = append(service.Endpoints, endpoint)
-		} else if strings.HasPrefix(name, serviceDescNodeKey) {
-			if err := json.Unmarshal(kv.Value, &service.ServiceDesc); err != nil {
-				glog.Errorf("invalid desc(%s), unmarshal fail: %v", string(kv.Key), string(kv.Value))
-				return nil, utils.NewSystemError("service-data damanged")
-			}
-		}
-	}
-	return &service, nil
-}
-
-func (ctrl *ServiceCtrl) makeAllService(clientIp net.IP, name string, kvs []*mvccpb.KeyValue) (map[string]*Service, error) {
-	mkvs := make(map[string][]*mvccpb.KeyValue)
-	for _, kv := range kvs {
-		parts := strings.Split(string(kv.Key), "/")
-		if len(parts) == 1 {
-			continue
-		}
-		version := parts[len(parts)-2]
-		mkvs[version] = append(mkvs[version], kv)
-	}
-
-	services := make(map[string]*Service)
-	for version, subkvs := range mkvs {
-		if service, err := ctrl.makeService(clientIp, name, version, subkvs); err == nil {
-			services[version] = service
+			endpoint.Address = ctrl.config.mapAddress(endpoint.Address, clientIP)
+			serviceZone.Endpoints = append(serviceZone.Endpoints, endpoint)
 		} else {
-			return nil, err
+			glog.Warningf("got unexpected service node: %s", string(kv.Key))
 		}
 	}
-	return services, nil
+	return &ServiceV1{Zones: zones}, nil
 }

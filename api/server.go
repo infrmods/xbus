@@ -3,6 +3,11 @@ package api
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/coreos/etcd/clientv3"
 	"github.com/facebookgo/httpdown"
 	"github.com/golang/glog"
@@ -13,10 +18,6 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/engine/standard"
 	"github.com/labstack/echo/middleware"
-	"net"
-	"net/http"
-	"strings"
-	"time"
 )
 
 type IPNet net.IPNet
@@ -79,7 +80,8 @@ func (server *APIServer) Start() error {
 		}))
 	}
 	e.Use(echo.MiddlewareFunc(server.verifyApp))
-	server.registerServiceAPIs(e.Group("/api/services"))
+	server.registerV0ServiceAPIs(e.Group("/api/services"))
+	server.registerV1ServiceAPIs(e.Group("/api/v1/services"))
 	server.registerConfigAPIs(e.Group("/api/configs"))
 	server.registerAppAPIs(e.Group("/api/apps"))
 	server.registerLeaseAPIs(e.Group("/api/leases"))
@@ -232,23 +234,36 @@ func (server *APIServer) newPermChecker(permType int, needWrite bool) echo.Middl
 	})
 }
 
-func (server *APIServer) registerServiceAPIs(g *echo.Group) {
-	g.Post("/:name/:version", echo.HandlerFunc(server.PlugService),
+func (server *APIServer) registerV0ServiceAPIs(g *echo.Group) {
+	g.Post("/:name/:version", echo.HandlerFunc(server.v0PlugService),
 		server.newPermChecker(apps.PermTypeService, true))
-	g.Delete("/:name/:version/:id", echo.HandlerFunc(server.UnplugService),
+	g.Delete("/:name/:version/:id", echo.HandlerFunc(server.v0UnplugService),
 		server.newPermChecker(apps.PermTypeService, true))
-	g.Post("", echo.HandlerFunc(server.PlugAllService))
-	g.Put("/:name/:version/:id", echo.HandlerFunc(server.UpdateService),
+	g.Post("", echo.HandlerFunc(server.v0PlugAllService))
+	g.Put("/:name/:version/:id", echo.HandlerFunc(server.v0UpdateService),
 		server.newPermChecker(apps.PermTypeService, true))
-	g.Get("", echo.HandlerFunc(server.SearchService))
+	g.Get("", echo.HandlerFunc(server.v0SearchService))
 
 	if server.config.PermitPublicServiceQuery {
-		g.Get("/:name/:version", echo.HandlerFunc(server.QueryService))
-		g.Get("/:name", echo.HandlerFunc(server.QueryServiceAllVersions))
+		g.Get("/:name/:version", echo.HandlerFunc(server.v0QueryService))
 	} else {
-		g.Get("/:name/:version", echo.HandlerFunc(server.QueryService),
+		g.Get("/:name/:version", echo.HandlerFunc(server.v0QueryService),
 			server.newPermChecker(apps.PermTypeService, false))
-		g.Get("/:name", echo.HandlerFunc(server.QueryServiceAllVersions),
+	}
+}
+
+func (server *APIServer) registerV1ServiceAPIs(g *echo.Group) {
+	g.Post("/:service", echo.HandlerFunc(server.v1PlugService),
+		server.newPermChecker(apps.PermTypeService, true))
+	g.Delete("/:service/:zone/:addr", echo.HandlerFunc(server.v1UnplugService),
+		server.newPermChecker(apps.PermTypeService, true))
+	g.Post("", echo.HandlerFunc(server.v1PlugAllService))
+	g.Get("", echo.HandlerFunc(server.v1SearchService))
+
+	if server.config.PermitPublicServiceQuery {
+		g.Get("/:service", echo.HandlerFunc(server.v1QueryService))
+	} else {
+		g.Get("/:service", echo.HandlerFunc(server.v1QueryService),
 			server.newPermChecker(apps.PermTypeService, false))
 	}
 }

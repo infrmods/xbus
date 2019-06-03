@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"encoding/pem"
 	"fmt"
-	"github.com/gocomm/dbutil"
 	"strconv"
 	"time"
+
+	"github.com/gocomm/dbutil"
 )
 
 type App struct {
@@ -81,7 +82,7 @@ func GetAppGroupByName(db *sql.DB, name string) (*App, []int64, error) {
                                group_concat(groups.id, ",")
                         from apps
                         left join group_members on group_members.app_id=apps.id
-                        left join groups on group_members.group_id=groups.id
+                        left join `+"`groups`"+` on group_members.group_id=groups.id
 						where apps.name=?
                         group by apps.id,groups.id`, name)
 	var app App

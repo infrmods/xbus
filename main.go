@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"flag"
+	"os"
+
 	"github.com/coreos/etcd/clientv3"
 	"github.com/gocomm/config"
 	"github.com/golang/glog"
@@ -16,7 +18,6 @@ import (
 	"github.com/infrmods/xbus/utils"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
-	"os"
 )
 
 type Config struct {
@@ -33,7 +34,7 @@ type Config struct {
 	}
 }
 
-var cfgPath = flag.String("config", "config.yml", "config file path")
+var cfgPath = flag.String("config", "config.yaml", "config file path")
 
 type XBus struct {
 	Config Config

@@ -4,25 +4,28 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/coreos/etcd/clientv3"
-	"github.com/golang/glog"
-	"github.com/infrmods/xbus/utils"
-	"golang.org/x/net/context"
 	"net"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/coreos/etcd/clientv3"
+	"github.com/golang/glog"
+	"github.com/infrmods/xbus/utils"
+	"golang.org/x/net/context"
 )
 
-type ServiceDesc struct {
-	Name        string `json:"name,omitempty"`
-	Version     string `json:"version,omitempty"`
+const DefaultZone = "default"
+
+type ServiceDescV1 struct {
+	Service     string `json:"service"`
+	Zone        string `json:"zone,omitempty"`
 	Type        string `json:"type"`
 	Proto       string `json:"proto,omitempty"`
 	Description string `json:"description,omitempty"`
 }
 
-func (desc *ServiceDesc) Marshal() ([]byte, error) {
+func (desc *ServiceDescV1) Marshal() ([]byte, error) {
 	if data, err := json.Marshal(desc); err == nil {
 		return data, nil
 	} else {
@@ -45,10 +48,14 @@ func (endpoint *ServiceEndpoint) Marshal() ([]byte, error) {
 	}
 }
 
-type Service struct {
+type ServiceZoneV1 struct {
 	Endpoints []ServiceEndpoint `json:"endpoints"`
 
-	ServiceDesc
+	ServiceDescV1
+}
+
+type ServiceV1 struct {
+	Zones map[string]*ServiceZoneV1
 }
 
 type NetMapping struct {
@@ -130,19 +137,19 @@ func NewServiceCtrl(config *Config, db *sql.DB, etcdClient *clientv3.Client) (*S
 	return services, nil
 }
 
-func checkDesc(desc *ServiceDesc) error {
-	if err := checkNameVersion(desc.Name, desc.Version); err != nil {
+func checkDesc(desc *ServiceDescV1) error {
+	if err := checkServiceZone(desc.Service, desc.Zone); err != nil {
 		return err
 	}
 	if desc.Type == "" {
-		return utils.Errorf(utils.EcodeInvalidEndpoint, "%s:%s missing type", desc.Name, desc.Version)
+		return utils.Errorf(utils.EcodeInvalidEndpoint, "%s:%s missing type", desc.Service, desc.Zone)
 	}
 	return nil
 }
 
 func (ctrl *ServiceCtrl) Plug(ctx context.Context,
 	ttl time.Duration, leaseId clientv3.LeaseID,
-	desc *ServiceDesc, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
+	desc *ServiceDescV1, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
 	if err := checkDesc(desc); err != nil {
 		return 0, err
 	}
@@ -153,30 +160,30 @@ func (ctrl *ServiceCtrl) Plug(ctx context.Context,
 		return 0, err
 	}
 
-	desc_data, err := desc.Marshal()
-	endpoint_data, err := endpoint.Marshal()
+	descData, err := desc.Marshal()
+	endpointData, err := endpoint.Marshal()
 	if err != nil {
 		return 0, err
 	}
-	if err := ctrl.updateServices([]ServiceDesc{*desc}); err != nil {
+	if err := ctrl.updateServices([]ServiceDescV1{*desc}); err != nil {
 		return 0, err
 	}
-	if err := ctrl.ensureServiceDesc(ctx, desc.Name, desc.Version, string(desc_data)); err != nil {
+	if err := ctrl.ensureServiceDesc(ctx, desc.Service, desc.Zone, string(descData)); err != nil {
 		return 0, err
 	}
 	return ctrl.setServiceNode(ctx, ttl, leaseId,
-		ctrl.serviceKey(desc.Name, desc.Version, endpoint.Address), string(endpoint_data))
+		ctrl.serviceKey(desc.Service, desc.Zone, endpoint.Address), string(endpointData))
 }
 
-func (ctrl *ServiceCtrl) Unplug(ctx context.Context, name, version, addr string) error {
-	if err := checkNameVersion(name, version); err != nil {
+func (ctrl *ServiceCtrl) Unplug(ctx context.Context, service, zone, addr string) error {
+	if err := checkServiceZone(service, zone); err != nil {
 		return err
 	}
 	if err := ctrl.checkAddress(addr); err != nil {
 		return err
 	}
-	if _, err := ctrl.etcdClient.Delete(ctx, ctrl.serviceKey(name, version, addr)); err != nil {
-		glog.Errorf("delete key(%s) fail: %v", ctrl.serviceKey(name, version, addr), err)
+	if _, err := ctrl.etcdClient.Delete(ctx, ctrl.serviceKey(service, zone, addr)); err != nil {
+		glog.Errorf("delete key(%s) fail: %v", ctrl.serviceKey(service, zone, addr), err)
 		return utils.NewSystemError("delete key fail")
 	}
 	return nil
@@ -184,14 +191,14 @@ func (ctrl *ServiceCtrl) Unplug(ctx context.Context, name, version, addr string)
 
 func (ctrl *ServiceCtrl) PlugAllService(ctx context.Context,
 	ttl time.Duration, leaseId clientv3.LeaseID,
-	desces []ServiceDesc, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
+	desces []ServiceDescV1, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
 	if endpoint.Address == "" {
 		return 0, utils.NewError(utils.EcodeInvalidEndpoint, "missing address")
 	}
 	if err := ctrl.checkAddress(endpoint.Address); err != nil {
 		return 0, err
 	}
-	endpoint_data, err := endpoint.Marshal()
+	endpointData, err := endpoint.Marshal()
 	if err != nil {
 		return 0, err
 	}
@@ -203,40 +210,32 @@ func (ctrl *ServiceCtrl) PlugAllService(ctx context.Context,
 		if err := checkDesc(&desc); err != nil {
 			return 0, err
 		}
-		desc_data, err := desc.Marshal()
+		descData, err := desc.Marshal()
 		if err != nil {
 			return 0, err
 		}
-		if err := ctrl.ensureServiceDesc(ctx, desc.Name, desc.Version, string(desc_data)); err != nil {
+		if err := ctrl.ensureServiceDesc(ctx, desc.Service, desc.Zone, string(descData)); err != nil {
 			return 0, err
 		}
 	}
 	for _, desc := range desces {
 		if leaseId, err = ctrl.setServiceNode(ctx, ttl, leaseId,
-			ctrl.serviceKey(desc.Name, desc.Version, endpoint.Address),
-			string(endpoint_data)); err != nil {
+			ctrl.serviceKey(desc.Service, desc.Zone, endpoint.Address),
+			string(endpointData)); err != nil {
 			return 0, err
 		}
 	}
 	return leaseId, nil
 }
 
-func (ctrl *ServiceCtrl) UnplugAllService(ctx context.Context, leaseId clientv3.LeaseID) error {
-	if _, err := ctrl.etcdClient.Lease.Revoke(ctx, leaseId); err == nil {
-		return nil
-	} else {
-		return utils.CleanErr(err, "unplug fail", "revoke lease(%v) fail: v", leaseId, err)
-	}
-}
-
-func (ctrl *ServiceCtrl) Update(ctx context.Context, name, version, addr string, endpoint *ServiceEndpoint) error {
-	if err := checkNameVersion(name, version); err != nil {
+func (ctrl *ServiceCtrl) Update(ctx context.Context, service, zone, addr string, endpoint *ServiceEndpoint) error {
+	if err := checkServiceZone(service, zone); err != nil {
 		return err
 	}
 	if err := ctrl.checkAddress(addr); err != nil {
 		return err
 	}
-	key := ctrl.serviceKey(name, version, addr)
+	key := ctrl.serviceKey(service, zone, addr)
 	data, err := endpoint.Marshal()
 	if err != nil {
 		return err
@@ -257,36 +256,20 @@ func (ctrl *ServiceCtrl) Update(ctx context.Context, name, version, addr string,
 	}
 }
 
-func (ctrl *ServiceCtrl) Query(ctx context.Context, clientIp net.IP, name, version string) (*Service, int64, error) {
-	if err := checkNameVersion(name, version); err != nil {
+func (ctrl *ServiceCtrl) Query(ctx context.Context, clientIp net.IP, service string) (*ServiceV1, int64, error) {
+	if err := checkService(service); err != nil {
 		return nil, 0, err
 	}
-	return ctrl.query(ctx, clientIp, name, version)
+	return ctrl._query(ctx, clientIp, service)
 }
 
-func (ctrl *ServiceCtrl) QueryAllVersions(ctx context.Context, clientIp net.IP, name string) (map[string]*Service, int64, error) {
-	if err := checkName(name); err != nil {
-		return nil, 0, err
-	}
-	key := ctrl.serviceEntryPrefix(name)
-	if resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix()); err == nil {
-		if services, err := ctrl.makeAllService(clientIp, name, resp.Kvs); err == nil {
-			return services, resp.Header.Revision, nil
-		} else {
-			return nil, 0, err
-		}
-	} else {
-		return nil, 0, utils.CleanErr(err, "query fail", "QueryAll(%s) fail: %v", key, err)
-	}
-}
-
-func (ctrl *ServiceCtrl) query(ctx context.Context, clientIp net.IP, name, version string) (*Service, int64, error) {
-	key := ctrl.serviceKeyPrefix(name, version)
+func (ctrl *ServiceCtrl) _query(ctx context.Context, clientIP net.IP, serviceKey string) (*ServiceV1, int64, error) {
+	key := ctrl.serviceEntryPrefix(serviceKey)
 	if resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix()); err == nil {
 		if len(resp.Kvs) == 0 {
-			return nil, 0, utils.Errorf(utils.EcodeNotFound, "no such service: %s:%s", name, version)
+			return nil, 0, utils.Errorf(utils.EcodeNotFound, "no such service: %s", serviceKey)
 		}
-		if service, err := ctrl.makeService(clientIp, name, version, resp.Kvs); err == nil {
+		if service, err := ctrl.makeService(clientIP, serviceKey, resp.Kvs); err == nil {
 			return service, resp.Header.Revision, nil
 		} else {
 			return nil, 0, err
@@ -296,12 +279,11 @@ func (ctrl *ServiceCtrl) query(ctx context.Context, clientIp net.IP, name, versi
 	}
 }
 
-func (ctrl *ServiceCtrl) Watch(ctx context.Context, clientIp net.IP, name, version string,
-	revision int64) (*Service, int64, error) {
-	if err := checkNameVersion(name, version); err != nil {
+func (ctrl *ServiceCtrl) Watch(ctx context.Context, clientIP net.IP, serviceKey string, revision int64) (*ServiceV1, int64, error) {
+	if err := checkService(serviceKey); err != nil {
 		return nil, 0, err
 	}
-	key := ctrl.serviceKeyPrefix(name, version)
+	key := ctrl.serviceEntryPrefix(serviceKey)
 	watcher := clientv3.NewWatcher(ctrl.etcdClient)
 	defer watcher.Close()
 
@@ -313,5 +295,5 @@ func (ctrl *ServiceCtrl) Watch(ctx context.Context, clientIp net.IP, name, versi
 	}
 
 	_ = <-watchCh
-	return ctrl.query(ctx, clientIp, name, version)
+	return ctrl._query(ctx, clientIP, serviceKey)
 }

@@ -2,12 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"time"
+
 	"github.com/infrmods/xbus/apps"
 	"github.com/infrmods/xbus/configs"
 	"github.com/infrmods/xbus/utils"
 	"github.com/labstack/echo"
 	"golang.org/x/net/context"
-	"time"
 )
 
 type ListResult struct {
@@ -136,7 +137,7 @@ func (server *APIServer) Watch(c echo.Context) error {
 	if !ok {
 		return err
 	}
-	timeout, ok, err := IntQueryParamD(c, "timeout", DefaultWatchTimeout)
+	timeout, ok, err := IntQueryParamD(c, "timeout", _DefaultWatchTimeout)
 	if !ok {
 		return err
 	}

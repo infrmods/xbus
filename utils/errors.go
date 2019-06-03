@@ -9,6 +9,8 @@ const (
 	EcodeInvalidParam         = "INVALID_PARAM"
 	EcodeMissingParam         = "MISSING_PARAM"
 	EcodeInvalidName          = "INVALID_NAME"
+	EcodeInvalidService       = "INVALID_SERVICE"
+	EcodeInvalidZone          = "INVALID_ZONE"
 	EcodeInvalidValue         = "INVALID_VALUE"
 	EcodeInvalidVersion       = "INVALID_VERSION"
 	EcodeInvalidAddress       = "INVALID_ADDRESS"

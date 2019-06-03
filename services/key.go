@@ -2,16 +2,18 @@ package services
 
 import (
 	"fmt"
+	"regexp"
+	"time"
+
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
 	"golang.org/x/net/context"
-	"regexp"
-	"time"
 )
 
 var rValidName = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]{5,}$`)
-var rValidVersion = regexp.MustCompile(`(?i)^[a-z0-9][a-z0-9_.-]*$`)
+var rValidService = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]{5,}:[a-z0-9][a-z0-9_.-]*$`)
+var rValidZone = regexp.MustCompile(`(?i)^[a-z0-9][a-z0-9_-]*$`)
 
 func checkName(name string) error {
 	if !rValidName.MatchString(name) {
@@ -20,12 +22,19 @@ func checkName(name string) error {
 	return nil
 }
 
-func checkNameVersion(name, version string) error {
-	if !rValidName.MatchString(name) {
-		return utils.NewError(utils.EcodeInvalidName, "")
+func checkService(service string) error {
+	if !rValidService.MatchString(service) {
+		return utils.NewError(utils.EcodeInvalidService, "")
 	}
-	if !rValidVersion.MatchString(version) {
-		return utils.NewError(utils.EcodeInvalidVersion, "")
+	return nil
+}
+
+func checkServiceZone(service, zone string) error {
+	if !rValidService.MatchString(service) {
+		return utils.NewError(utils.EcodeInvalidService, "")
+	}
+	if !rValidZone.MatchString(zone) {
+		return utils.NewError(utils.EcodeInvalidZone, "")
 	}
 	return nil
 }
@@ -46,26 +55,20 @@ func (ctrl *ServiceCtrl) serviceEntryPrefix(name string) string {
 	return fmt.Sprintf("%s/%s/", ctrl.config.KeyPrefix, name)
 }
 
-func (ctrl *ServiceCtrl) serviceKeyPrefix(name, version string) string {
-	return fmt.Sprintf("%s/%s/%s", ctrl.config.KeyPrefix, name, version)
+const serviceDescNodeKey = "desc"
+
+func (ctrl *ServiceCtrl) serviceDescKey(service, zone string) string {
+	return fmt.Sprintf("%s/%s/%s/desc", ctrl.config.KeyPrefix, service, zone)
 }
 
-var serviceDescNodeKey = "desc"
+const serviceKeyNodePrefix = "node_"
 
-func (ctrl *ServiceCtrl) serviceDescKey(name, version string) string {
-	return fmt.Sprintf("%s/%s/%s/desc", ctrl.config.KeyPrefix, name, version)
+func (ctrl *ServiceCtrl) serviceKey(service, zone, addr string) string {
+	return fmt.Sprintf("%s/%s/%s/node_%s", ctrl.config.KeyPrefix, service, zone, addr)
 }
 
-var serviceKeyNodePrefix = "node_"
-
-func (ctrl *ServiceCtrl) serviceKey(name, version, addr string) string {
-	return fmt.Sprintf("%s/%s/%s/node_%s", ctrl.config.KeyPrefix, name, version, addr)
-}
-
-const MAX_NEW_UNIQUE_TRY = 3
-
-func (ctrl *ServiceCtrl) ensureServiceDesc(ctx context.Context, name, version, value string) error {
-	key := ctrl.serviceDescKey(name, version)
+func (ctrl *ServiceCtrl) ensureServiceDesc(ctx context.Context, service, zone, value string) error {
+	key := ctrl.serviceDescKey(service, zone)
 	txn := ctrl.etcdClient.Txn(ctx).If(
 		clientv3.Compare(clientv3.Value(key), "=", value)).Then().Else(clientv3.OpPut(key, value))
 	if _, err := txn.Commit(); err != nil {
@@ -74,16 +77,16 @@ func (ctrl *ServiceCtrl) ensureServiceDesc(ctx context.Context, name, version, v
 	return nil
 }
 
-func (ctrl *ServiceCtrl) setServiceNode(ctx context.Context, ttl time.Duration, leaseId clientv3.LeaseID,
+func (ctrl *ServiceCtrl) setServiceNode(ctx context.Context, ttl time.Duration, leaseID clientv3.LeaseID,
 	key, value string) (_ clientv3.LeaseID, rerr error) {
-	if ttl > 0 && leaseId == 0 {
+	if ttl > 0 && leaseID == 0 {
 		if resp, err := ctrl.etcdClient.Lease.Grant(ctx, int64(ttl.Seconds())); err == nil {
-			leaseId = clientv3.LeaseID(resp.ID)
+			leaseID = clientv3.LeaseID(resp.ID)
 			defer func() {
 				if rerr != nil {
-					leaseId = 0
-					if _, err := ctrl.etcdClient.Revoke(context.Background(), leaseId); err != nil {
-						glog.Errorf("revoke lease(%d) fail: %v", leaseId, err)
+					leaseID = 0
+					if _, err := ctrl.etcdClient.Revoke(context.Background(), leaseID); err != nil {
+						glog.Errorf("revoke lease(%d) fail: %v", leaseID, err)
 					}
 				}
 			}()
@@ -92,16 +95,18 @@ func (ctrl *ServiceCtrl) setServiceNode(ctx context.Context, ttl time.Duration, 
 		}
 	}
 
-	var err error
-	if leaseId > 0 {
-		_, err = ctrl.etcdClient.Put(ctx, key, value, clientv3.WithLease(leaseId))
+	var opPut clientv3.Op
+	if leaseID > 0 {
+		opPut = clientv3.OpPut(key, value, clientv3.WithLease(leaseID))
 	} else {
-		_, err = ctrl.etcdClient.Put(ctx, key, value)
+		opPut = clientv3.OpPut(key, value)
 	}
-
-	if err != nil {
+	txn := ctrl.etcdClient.Txn(ctx).If(
+		clientv3.Compare(clientv3.Value(key), "=", value)).Then().Else(opPut)
+	if _, err := txn.Commit(); err != nil {
 		return 0, utils.CleanErr(err, "plug service fail",
 			"put service(%s) node fail: %v", key, err)
 	}
-	return leaseId, nil
+
+	return leaseID, nil
 }

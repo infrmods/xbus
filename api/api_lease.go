@@ -19,7 +19,7 @@ func (server *APIServer) GrantLease(c echo.Context) error {
 	if !ok {
 		return err
 	}
-	if ttl > 0 && ttl < MinServiceTTL {
+	if ttl > 0 && ttl < _MinServiceTTL {
 		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
 	}
 	if rep, err := server.etcdClient.Grant(context.Background(), ttl); err == nil {
