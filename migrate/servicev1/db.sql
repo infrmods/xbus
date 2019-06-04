@@ -1,4 +1,4 @@
-alter table services add column service varchar(256) not null after status;
+alter table services add column service varchar(240) not null after status;
 alter table services add column zone varchar(16) not null default "default" after service;
 alter table services drop index nv_dup;
 update services set service=concat(name, ':', version);
