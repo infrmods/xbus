@@ -101,7 +101,7 @@ func (ctrl *ServiceCtrl) SearchService(service string, skip int64, limit int64) 
 
 	result := SearchResultV1{Services: make([]ServiceItemV1, 0, limit), Total: total}
 	if total > skip {
-		if rows, err := ctrl.db.Query(`select service, zone, typ from services where name like ?
+		if rows, err := ctrl.db.Query(`select service, zone, typ from services where service like ?
 				order by modify_time desc limit ?,?`, like, skip, limit); err == nil {
 			defer rows.Close()
 			for rows.Next() {
