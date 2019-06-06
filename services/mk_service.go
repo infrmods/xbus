@@ -47,5 +47,5 @@ func (ctrl *ServiceCtrl) makeService(clientIP net.IP, serviceKey string, kvs []*
 			glog.Warningf("got unexpected service node: %s", string(kv.Key))
 		}
 	}
-	return &ServiceV1{Zones: zones}, nil
+	return &ServiceV1{Service: serviceKey, Zones: zones}, nil
 }

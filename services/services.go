@@ -55,7 +55,8 @@ type ServiceZoneV1 struct {
 }
 
 type ServiceV1 struct {
-	Zones map[string]*ServiceZoneV1 `json:"zones"`
+	Service string                    `json:"service"`
+	Zones   map[string]*ServiceZoneV1 `json:"zones"`
 }
 
 type NetMapping struct {
