@@ -1,5 +1,6 @@
 # subcommands #
 
+[![GoDoc](https://godoc.org/github.com/google/subcommands?status.svg)](https://godoc.org/github.com/google/subcommands)  
 Subcommands is a Go package that implements a simple way for a single command to
 have many subcommands, each of which takes arguments and so forth.
 
@@ -11,13 +12,13 @@ Set up a 'print' subcommand:
 
 ```go
 import (
+  "context"
   "flag"
   "fmt"
   "os"
   "strings"
 
   "github.com/google/subcommands"
-  "golang.org/x/net/context"
 )
 
 type printCmd struct {
