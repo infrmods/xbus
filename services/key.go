@@ -102,7 +102,8 @@ func (ctrl *ServiceCtrl) setServiceNode(ctx context.Context, ttl time.Duration, 
 		opPut = clientv3.OpPut(key, value)
 	}
 	txn := ctrl.etcdClient.Txn(ctx).If(
-		clientv3.Compare(clientv3.Value(key), "=", value)).Then().Else(opPut)
+		clientv3.Compare(clientv3.Value(key), "=", value),
+		clientv3.Compare(clientv3.LeaseValue(key), "=", leaseID)).Then().Else(opPut)
 	if _, err := txn.Commit(); err != nil {
 		return 0, utils.CleanErr(err, "plug service fail",
 			"put service(%s) node fail: %v", key, err)
