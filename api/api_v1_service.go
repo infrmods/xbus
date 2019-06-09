@@ -151,3 +151,11 @@ func (server *APIServer) v1WatchService(c echo.Context) error {
 		return JsonError(c, err)
 	}
 }
+
+func (server *APIServer) v1DeleteService(c echo.Context) error {
+	zone := c.QueryParam("zone")
+	if err := server.services.Delete(context.Background(), c.P(0), zone); err != nil {
+		return JsonError(c, err)
+	}
+	return JsonOk(c)
+}

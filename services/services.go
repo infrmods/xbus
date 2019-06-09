@@ -15,8 +15,10 @@ import (
 	"golang.org/x/net/context"
 )
 
+// DefaultZone default service zone
 const DefaultZone = "default"
 
+// ServiceDescV1 service descriptor
 type ServiceDescV1 struct {
 	Service     string `json:"service"`
 	Zone        string `json:"zone,omitempty"`
@@ -25,6 +27,7 @@ type ServiceDescV1 struct {
 	Description string `json:"description,omitempty"`
 }
 
+// Marshal marshal impl
 func (desc *ServiceDescV1) Marshal() ([]byte, error) {
 	if data, err := json.Marshal(desc); err == nil {
 		return data, nil
@@ -34,11 +37,13 @@ func (desc *ServiceDescV1) Marshal() ([]byte, error) {
 	}
 }
 
+// ServiceEndpoint service endpoint
 type ServiceEndpoint struct {
 	Address string `json:"address"`
 	Config  string `json:"config,omitempty"`
 }
 
+// Marshal marshal impl
 func (endpoint *ServiceEndpoint) Marshal() ([]byte, error) {
 	if data, err := json.Marshal(endpoint); err == nil {
 		return data, nil
@@ -48,23 +53,27 @@ func (endpoint *ServiceEndpoint) Marshal() ([]byte, error) {
 	}
 }
 
+// ServiceZoneV1 service zone
 type ServiceZoneV1 struct {
 	Endpoints []ServiceEndpoint `json:"endpoints"`
 
 	ServiceDescV1
 }
 
+// ServiceV1 service
 type ServiceV1 struct {
 	Service string                    `json:"service"`
 	Zones   map[string]*ServiceZoneV1 `json:"zones"`
 }
 
+// NetMapping net mapping
 type NetMapping struct {
 	SrcNet string `yaml:"src_net"`
-	DestIp string `yaml:"dest_ip"`
+	DestIP string `yaml:"dest_ip"`
 	srcNet *net.IPNet
 }
 
+// Config service module config
 type Config struct {
 	KeyPrefix               string       `default:"/services" yaml:"key_prefix"`
 	PermitChangeDesc        bool         `default:"false" yaml:"permit_change_desc"`
@@ -82,15 +91,15 @@ func (config *Config) prepare() error {
 			return fmt.Errorf("invalid banned address: %s", addr)
 		}
 	}
-	for i, _ := range config.NetMappings {
+	for i := range config.NetMappings {
 		mapping := &config.NetMappings[i]
 		if _, srcNet, err := net.ParseCIDR(mapping.SrcNet); err == nil {
 			mapping.srcNet = srcNet
 		} else {
 			return fmt.Errorf("invalid SrcNet: %s", mapping.SrcNet)
 		}
-		if ip := net.ParseIP(mapping.DestIp); ip == nil {
-			return fmt.Errorf("invalid DestIp: %s", mapping.DestIp)
+		if ip := net.ParseIP(mapping.DestIP); ip == nil {
+			return fmt.Errorf("invalid DestIp: %s", mapping.DestIP)
 		}
 	}
 	return nil
@@ -105,13 +114,13 @@ func (config *Config) isAddressBanned(addr string) bool {
 	return false
 }
 
-func (config *Config) mapAddress(addr string, clientIp net.IP) string {
-	if clientIp != nil {
+func (config *Config) mapAddress(addr string, clientIP net.IP) string {
+	if clientIP != nil {
 		if host, port, err := net.SplitHostPort(addr); err == nil {
 			if ip := net.ParseIP(host); ip != nil {
 				for _, mapping := range config.NetMappings {
-					if mapping.srcNet.Contains(ip) && !mapping.srcNet.Contains(clientIp) {
-						return net.JoinHostPort(mapping.DestIp, port)
+					if mapping.srcNet.Contains(ip) && !mapping.srcNet.Contains(clientIP) {
+						return net.JoinHostPort(mapping.DestIP, port)
 					}
 				}
 			}
@@ -120,12 +129,14 @@ func (config *Config) mapAddress(addr string, clientIp net.IP) string {
 	return addr
 }
 
+// ServiceCtrl service module controller
 type ServiceCtrl struct {
 	config     Config
 	db         *sql.DB
 	etcdClient *clientv3.Client
 }
 
+// NewServiceCtrl new service ctrl
 func NewServiceCtrl(config *Config, db *sql.DB, etcdClient *clientv3.Client) (*ServiceCtrl, error) {
 	if err := config.prepare(); err != nil {
 		return nil, err
@@ -148,8 +159,9 @@ func checkDesc(desc *ServiceDescV1) error {
 	return nil
 }
 
+// Plug plug service
 func (ctrl *ServiceCtrl) Plug(ctx context.Context,
-	ttl time.Duration, leaseId clientv3.LeaseID,
+	ttl time.Duration, leaseID clientv3.LeaseID,
 	desc *ServiceDescV1, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
 	if err := checkDesc(desc); err != nil {
 		return 0, err
@@ -166,16 +178,17 @@ func (ctrl *ServiceCtrl) Plug(ctx context.Context,
 	if err != nil {
 		return 0, err
 	}
-	if err := ctrl.updateServices([]ServiceDescV1{*desc}); err != nil {
+	if err := ctrl.updateServiceDBItems([]ServiceDescV1{*desc}); err != nil {
 		return 0, err
 	}
 	if err := ctrl.ensureServiceDesc(ctx, desc.Service, desc.Zone, string(descData)); err != nil {
 		return 0, err
 	}
-	return ctrl.setServiceNode(ctx, ttl, leaseId,
+	return ctrl.setServiceNode(ctx, ttl, leaseID,
 		ctrl.serviceKey(desc.Service, desc.Zone, endpoint.Address), string(endpointData))
 }
 
+// Unplug unplug service
 func (ctrl *ServiceCtrl) Unplug(ctx context.Context, service, zone, addr string) error {
 	if err := checkServiceZone(service, zone); err != nil {
 		return err
@@ -190,8 +203,9 @@ func (ctrl *ServiceCtrl) Unplug(ctx context.Context, service, zone, addr string)
 	return nil
 }
 
+// PlugAllService plug services
 func (ctrl *ServiceCtrl) PlugAllService(ctx context.Context,
-	ttl time.Duration, leaseId clientv3.LeaseID,
+	ttl time.Duration, leaseID clientv3.LeaseID,
 	desces []ServiceDescV1, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
 	if endpoint.Address == "" {
 		return 0, utils.NewError(utils.EcodeInvalidEndpoint, "missing address")
@@ -204,7 +218,7 @@ func (ctrl *ServiceCtrl) PlugAllService(ctx context.Context,
 		return 0, err
 	}
 
-	if err := ctrl.updateServices(desces); err != nil {
+	if err := ctrl.updateServiceDBItems(desces); err != nil {
 		return 0, err
 	}
 	for _, desc := range desces {
@@ -220,15 +234,16 @@ func (ctrl *ServiceCtrl) PlugAllService(ctx context.Context,
 		}
 	}
 	for _, desc := range desces {
-		if leaseId, err = ctrl.setServiceNode(ctx, ttl, leaseId,
+		if leaseID, err = ctrl.setServiceNode(ctx, ttl, leaseID,
 			ctrl.serviceKey(desc.Service, desc.Zone, endpoint.Address),
 			string(endpointData)); err != nil {
 			return 0, err
 		}
 	}
-	return leaseId, nil
+	return leaseID, nil
 }
 
+// Update update service endpoint
 func (ctrl *ServiceCtrl) Update(ctx context.Context, service, zone, addr string, endpoint *ServiceEndpoint) error {
 	if err := checkServiceZone(service, zone); err != nil {
 		return err
@@ -242,26 +257,23 @@ func (ctrl *ServiceCtrl) Update(ctx context.Context, service, zone, addr string,
 		return err
 	}
 
-	resp, err := ctrl.etcdClient.Txn(
-		ctx,
-	).If(
-		clientv3.Compare(clientv3.Version(key), ">", 0),
-	).Then(clientv3.OpPut(key, string(data))).Commit()
-	if err == nil {
+	txn := ctrl.etcdClient.Txn(ctx).If(clientv3.Compare(clientv3.Version(key), ">", 0)).Then(clientv3.OpPut(key, string(data)))
+	if resp, err := txn.Commit(); err != nil {
+		return utils.CleanErr(err, "update fail", "tnx update(%s) fail: %v", key, err)
+	} else {
 		if resp.Succeeded {
 			return nil
 		}
 		return utils.NewError(utils.EcodeNotFound, "")
-	} else {
-		return utils.CleanErr(err, "update fail", "tnx update(%s) fail: %v", key, err)
 	}
 }
 
-func (ctrl *ServiceCtrl) Query(ctx context.Context, clientIp net.IP, service string) (*ServiceV1, int64, error) {
+// Query query service
+func (ctrl *ServiceCtrl) Query(ctx context.Context, clientIP net.IP, service string) (*ServiceV1, int64, error) {
 	if err := checkService(service); err != nil {
 		return nil, 0, err
 	}
-	return ctrl._query(ctx, clientIp, service)
+	return ctrl._query(ctx, clientIP, service)
 }
 
 func (ctrl *ServiceCtrl) _query(ctx context.Context, clientIP net.IP, serviceKey string) (*ServiceV1, int64, error) {
@@ -280,6 +292,7 @@ func (ctrl *ServiceCtrl) _query(ctx context.Context, clientIP net.IP, serviceKey
 	}
 }
 
+// Watch watch service
 func (ctrl *ServiceCtrl) Watch(ctx context.Context, clientIP net.IP, serviceKey string, revision int64) (*ServiceV1, int64, error) {
 	if err := checkService(serviceKey); err != nil {
 		return nil, 0, err
@@ -297,4 +310,27 @@ func (ctrl *ServiceCtrl) Watch(ctx context.Context, clientIP net.IP, serviceKey 
 
 	_ = <-watchCh
 	return ctrl._query(ctx, clientIP, serviceKey)
+}
+
+// Delete delete service
+func (ctrl *ServiceCtrl) Delete(ctx context.Context, serviceKey string, zone string) error {
+	entryPrefix := ctrl.serviceEntryPrefix(serviceKey)
+	if zone != "" {
+		entryPrefix += zone + "/"
+	}
+	if resp, err := ctrl.etcdClient.Get(ctx, entryPrefix, clientv3.WithPrefix()); err == nil {
+		for _, kv := range resp.Kvs {
+			if !strings.HasSuffix(string(kv.Key), serviceDescNodeKey) {
+				return utils.NewError("HAS_ENDPOINTS", "has endpoints plugged on")
+			}
+		}
+		if len(resp.Kvs) > 0 {
+			if _, err := ctrl.etcdClient.Delete(ctx, entryPrefix, clientv3.WithPrefix()); err != nil {
+				return utils.CleanErr(err, "delete service keys fail", "delete service keys(%s) fail: %v", entryPrefix, err)
+			}
+		}
+	} else {
+		return utils.CleanErr(err, "get service keys fail", "precheck delete(%s) fail: %v", entryPrefix, err)
+	}
+	return ctrl.deleteServiceDBItems(serviceKey, zone)
 }

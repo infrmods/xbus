@@ -69,7 +69,7 @@ func (cmd *GenRootCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interfac
 		KeyUsage:  x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 
 		BasicConstraintsValid: true,
-		IsCA: true,
+		IsCA:                  true,
 	}
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template,
 		privKey.Public(), privKey)

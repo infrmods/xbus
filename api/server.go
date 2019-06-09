@@ -255,6 +255,8 @@ func (server *APIServer) registerV0ServiceAPIs(g *echo.Group) {
 func (server *APIServer) registerV1ServiceAPIs(g *echo.Group) {
 	g.Post("/:service", echo.HandlerFunc(server.v1PlugService),
 		server.newPermChecker(apps.PermTypeService, true))
+	g.Delete("/:service", echo.HandlerFunc(server.v1DeleteService),
+		server.newPermChecker(apps.PermTypeService, true))
 	g.Delete("/:service/:zone/:addr", echo.HandlerFunc(server.v1UnplugService),
 		server.newPermChecker(apps.PermTypeService, true))
 	g.Post("", echo.HandlerFunc(server.v1PlugAllService))
