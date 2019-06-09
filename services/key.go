@@ -13,7 +13,7 @@ import (
 
 var rValidName = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]{5,}$`)
 var rValidService = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]{5,}:[a-z0-9][a-z0-9_.-]*$`)
-var rValidZone = regexp.MustCompile(`(?i)^[a-z0-9][a-z0-9_-]*$`)
+var rValidZone = regexp.MustCompile(`(?i)^[a-z0-9][a-z0-9_-]{3,}$`)
 
 func checkName(name string) error {
 	if !rValidName.MatchString(name) {
