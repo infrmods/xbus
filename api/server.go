@@ -27,8 +27,7 @@ type Config struct {
 	Listen      string        `default:"127.0.0.1:4433"`
 	CertFile    string        `default:"apicert.pem"`
 	KeyFile     string        `default:"apikey.pem"`
-	StopTimeout time.Duration `default:"5s" yaml:"stop_timeout"`
-	KillTimeout time.Duration `default:"20s" yaml:"kill_timeout"`
+	StopTimeout time.Duration `default:"60s" yaml:"stop_timeout"`
 
 	PermitPublicServiceQuery bool `default:"true"`
 	DevNets                  []IPNet
@@ -109,7 +108,7 @@ func (server *APIServer) Run() error {
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), server.config.StopTimeout)
 	defer cancel()
 	return server.e.Shutdown(ctx)
 }
