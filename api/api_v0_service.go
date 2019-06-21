@@ -10,7 +10,7 @@ import (
 	"github.com/infrmods/xbus/apps"
 	"github.com/infrmods/xbus/services"
 	"github.com/infrmods/xbus/utils"
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 )
 
 const (

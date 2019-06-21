@@ -2,10 +2,11 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/infrmods/xbus/utils"
-	"github.com/labstack/echo"
 	"net/http"
 	"strconv"
+
+	"github.com/infrmods/xbus/utils"
+	"github.com/labstack/echo/v4"
 )
 
 func intParam(c echo.Context, name, value string) (int64, bool, error) {

@@ -1,9 +1,10 @@
 package api
 
 import (
-	"github.com/infrmods/xbus/utils"
-	"github.com/labstack/echo"
 	"net/http"
+
+	"github.com/infrmods/xbus/utils"
+	"github.com/labstack/echo/v4"
 )
 
 type Response struct {

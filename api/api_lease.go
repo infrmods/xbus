@@ -7,7 +7,7 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/infrmods/xbus/utils"
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 )
 
 type LeaseGrantResult struct {

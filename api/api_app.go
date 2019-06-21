@@ -4,7 +4,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/apps"
 	"github.com/infrmods/xbus/utils"
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 )
 
 func (server *APIServer) GetAppCert(c echo.Context) error {

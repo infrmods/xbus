@@ -17,8 +17,8 @@ import (
 	"github.com/infrmods/xbus/configs"
 	"github.com/infrmods/xbus/services"
 	"github.com/infrmods/xbus/utils"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 type IPNet net.IPNet
