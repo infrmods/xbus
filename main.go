@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
@@ -16,7 +17,6 @@ import (
 	"github.com/infrmods/xbus/configs"
 	"github.com/infrmods/xbus/services"
 	"github.com/infrmods/xbus/utils"
-	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
 )
 

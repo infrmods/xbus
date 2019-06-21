@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/infrmods/xbus/services"
 	"github.com/infrmods/xbus/utils"
 	"github.com/labstack/echo"
-	"golang.org/x/net/context"
 )
 
 const (
@@ -87,7 +87,7 @@ func (server *APIServer) v0PlugService(c echo.Context) error {
 	if ok, err := JsonFormParam(c, "desc", &desc); !ok {
 		return err
 	}
-	desc.Name, desc.Version = c.P(0), c.P(1)
+	desc.Name, desc.Version = c.ParamValues()[0], c.ParamValues()[1]
 	var endpoint services.ServiceEndpoint
 	if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
 		return err
@@ -153,8 +153,8 @@ func (server *APIServer) v0PlugAllService(c echo.Context) error {
 }
 
 func (server *APIServer) v0UnplugService(c echo.Context) error {
-	service := fmt.Sprintf("%s:%s", c.P(0), c.P(1))
-	if err := server.services.Unplug(context.Background(), service, services.DefaultZone, c.P(2)); err == nil {
+	service := fmt.Sprintf("%s:%s", c.ParamValues()[0], c.ParamValues()[1])
+	if err := server.services.Unplug(context.Background(), service, services.DefaultZone, c.ParamValues()[2]); err == nil {
 		return JsonOk(c)
 	} else {
 		return JsonError(c, err)
@@ -166,13 +166,14 @@ func (server *APIServer) v0UpdateService(c echo.Context) error {
 	if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
 		return err
 	}
+	params := c.ParamValues()
 	if endpoint.Address == "" {
-		endpoint.Address = c.P(2)
-	} else if endpoint.Address != c.P(2) {
+		endpoint.Address = params[2]
+	} else if endpoint.Address != params[2] {
 		return JsonErrorf(c, utils.EcodeInvalidParam, "can't modify address")
 	}
-	service := fmt.Sprintf("%s:%s", c.P(0), c.P(1))
-	if err := server.services.Update(context.Background(), service, services.DefaultZone, c.P(2), &endpoint); err != nil {
+	service := fmt.Sprintf("%s:%s", params[0], params[1])
+	if err := server.services.Update(context.Background(), service, services.DefaultZone, params[2], &endpoint); err != nil {
 		return JsonError(c, err)
 	}
 	return JsonOk(c)
@@ -221,8 +222,9 @@ func (server *APIServer) v0QueryService(c echo.Context) error {
 	if c.QueryParam("watch") == "true" {
 		return server.v0WatchService(c)
 	}
-	serviceKey := fmt.Sprintf("%s:%s", c.P(0), c.P(1))
-	if service, rev, err := server.services.Query(context.Background(), server.getRemoteIp(c), serviceKey); err == nil {
+	params := c.ParamValues()
+	serviceKey := fmt.Sprintf("%s:%s", params[0], params[1])
+	if service, rev, err := server.services.Query(context.Background(), server.getRemoteIP(c), serviceKey); err == nil {
 		serviceV0 := newServiceV0(service)
 		if serviceV0 == nil {
 			return JsonError(c, utils.Errorf(utils.EcodeNotFound, "no such service: %s", serviceKey))
@@ -245,8 +247,9 @@ func (server *APIServer) v0WatchService(c echo.Context) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancelFunc()
 
-	serviceKey := fmt.Sprintf("%s:%s", c.P(0), c.P(1))
-	if service, rev, err := server.services.Watch(ctx, server.getRemoteIp(c), serviceKey, revision); err == nil {
+	params := c.ParamValues()
+	serviceKey := fmt.Sprintf("%s:%s", params[0], params[1])
+	if service, rev, err := server.services.Watch(ctx, server.getRemoteIP(c), serviceKey, revision); err == nil {
 		serviceV0 := newServiceV0(service)
 		if serviceV0 == nil {
 			return JsonError(c, utils.Errorf(utils.EcodeNotFound, "no such service: %s", serviceKey))

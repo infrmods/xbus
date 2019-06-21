@@ -1,12 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
+
 	"github.com/golang/glog"
 	"github.com/google/subcommands"
 	"github.com/infrmods/xbus/apps"
 	"github.com/infrmods/xbus/utils"
-	"golang.org/x/net/context"
 )
 
 type KeyCertCmd struct {

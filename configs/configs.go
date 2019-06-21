@@ -1,13 +1,14 @@
 package configs
 
 import (
+	"context"
 	"database/sql"
+	"strings"
+
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
-	"golang.org/x/net/context"
-	"strings"
 )
 
 type ConfigItem struct {

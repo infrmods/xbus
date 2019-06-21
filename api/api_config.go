@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -8,7 +9,6 @@ import (
 	"github.com/infrmods/xbus/configs"
 	"github.com/infrmods/xbus/utils"
 	"github.com/labstack/echo"
-	"golang.org/x/net/context"
 )
 
 type ListResult struct {
@@ -51,9 +51,9 @@ func (server *APIServer) GetConfig(c echo.Context) error {
 	if c.QueryParam("watch") == "true" {
 		return server.Watch(c)
 	}
-	node := c.Request().Header().Get("node")
+	node := c.Request().Header.Get("node")
 
-	if cfg, rev, err := server.configs.Get(context.Background(), server.appId(c), node, c.P(0)); err == nil {
+	if cfg, rev, err := server.configs.Get(context.Background(), server.appId(c), node, c.ParamValues()[0]); err == nil {
 		return JsonResult(c, ConfigQueryResult{Config: cfg, Revision: rev})
 	} else {
 		return JsonError(c, err)
@@ -86,7 +86,7 @@ func (server *APIServer) GetAllConfigs(c echo.Context) error {
 		return server.newNotPermittedResp(c, not_permitted...)
 	}
 
-	node := c.Request().Header().Get("node")
+	node := c.Request().Header.Get("node")
 	result := ConfigsQueryResult{Configs: make([]*configs.ConfigItem, 0, len(keys)), Revision: 0}
 	for _, key := range keys {
 		if cfg, rev, err := server.configs.Get(context.Background(), server.appId(c), node, key); err == nil {
@@ -102,7 +102,7 @@ func (server *APIServer) GetAllConfigs(c echo.Context) error {
 }
 
 func (server *APIServer) DeleteConfig(c echo.Context) error {
-	if err := server.configs.Delete(context.Background(), c.P(0)); err == nil {
+	if err := server.configs.Delete(context.Background(), c.ParamValues()[0]); err == nil {
 		return JsonOk(c)
 	} else {
 		return JsonError(c, err)
@@ -125,7 +125,7 @@ func (server *APIServer) PutConfig(c echo.Context) error {
 	}
 	remark := c.FormValue("remark")
 
-	if rev, err := server.configs.Put(context.Background(), tag, c.P(0), server.appId(c), remark, value, version); err == nil {
+	if rev, err := server.configs.Put(context.Background(), tag, c.ParamValues()[0], server.appId(c), remark, value, version); err == nil {
 		return JsonResult(c, ConfigPutResult{Revision: rev})
 	} else {
 		return JsonError(c, err)
@@ -143,9 +143,9 @@ func (server *APIServer) Watch(c echo.Context) error {
 	}
 	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancelFunc()
-	node := c.Request().Header().Get("node")
+	node := c.Request().Header.Get("node")
 
-	if cfg, rev, err := server.configs.Watch(ctx, server.appId(c), node, c.P(0), revision); err == nil {
+	if cfg, rev, err := server.configs.Watch(ctx, server.appId(c), node, c.ParamValues()[0], revision); err == nil {
 		return JsonResult(c, ConfigQueryResult{Config: cfg, Revision: rev})
 	} else {
 		return JsonError(c, err)

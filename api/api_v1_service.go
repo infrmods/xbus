@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
@@ -8,7 +9,6 @@ import (
 	"github.com/infrmods/xbus/services"
 	"github.com/infrmods/xbus/utils"
 	"github.com/labstack/echo"
-	"golang.org/x/net/context"
 )
 
 func (server *APIServer) v1PlugService(c echo.Context) error {
@@ -31,7 +31,7 @@ func (server *APIServer) v1PlugService(c echo.Context) error {
 	if desc.Zone == "" {
 		desc.Zone = services.DefaultZone
 	}
-	desc.Service = c.P(0)
+	desc.Service = c.ParamValues()[0]
 	var endpoint services.ServiceEndpoint
 	if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
 		return err
@@ -94,7 +94,8 @@ func (server *APIServer) v1PlugAllService(c echo.Context) error {
 }
 
 func (server *APIServer) v1UnplugService(c echo.Context) error {
-	if err := server.services.Unplug(context.Background(), c.P(0), c.P(1), c.P(2)); err == nil {
+	params := c.ParamValues()
+	if err := server.services.Unplug(context.Background(), params[0], params[1], params[2]); err == nil {
 		return JsonOk(c)
 	} else {
 		return JsonError(c, err)
@@ -126,7 +127,7 @@ func (server *APIServer) v1QueryService(c echo.Context) error {
 	if c.QueryParam("watch") == "true" {
 		return server.v1WatchService(c)
 	}
-	if service, rev, err := server.services.Query(context.Background(), server.getRemoteIp(c), c.P(0)); err == nil {
+	if service, rev, err := server.services.Query(context.Background(), server.getRemoteIP(c), c.ParamValues()[0]); err == nil {
 		return JsonResult(c, _ServiceQueryResultV1{Service: service, Revision: rev})
 	} else {
 		return JsonError(c, err)
@@ -145,7 +146,7 @@ func (server *APIServer) v1WatchService(c echo.Context) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancelFunc()
 
-	if service, rev, err := server.services.Watch(ctx, server.getRemoteIp(c), c.P(0), revision); err == nil {
+	if service, rev, err := server.services.Watch(ctx, server.getRemoteIP(c), c.ParamValues()[0], revision); err == nil {
 		return JsonResult(c, _ServiceQueryResultV1{Service: service, Revision: rev})
 	} else {
 		return JsonError(c, err)
@@ -154,7 +155,7 @@ func (server *APIServer) v1WatchService(c echo.Context) error {
 
 func (server *APIServer) v1DeleteService(c echo.Context) error {
 	zone := c.QueryParam("zone")
-	if err := server.services.Delete(context.Background(), c.P(0), zone); err != nil {
+	if err := server.services.Delete(context.Background(), c.ParamValues()[0], zone); err != nil {
 		return JsonError(c, err)
 	}
 	return JsonOk(c)

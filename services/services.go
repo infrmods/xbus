@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
-	"golang.org/x/net/context"
 )
 
 // DefaultZone default service zone

@@ -1,12 +1,13 @@
 package api
 
 import (
+	"context"
+	"net/http"
+	"strconv"
+
 	"github.com/coreos/etcd/clientv3"
 	"github.com/infrmods/xbus/utils"
 	"github.com/labstack/echo"
-	"golang.org/x/net/context"
-	"net/http"
-	"strconv"
 )
 
 type LeaseGrantResult struct {
@@ -41,7 +42,7 @@ func parseLeaseId(s string) (clientv3.LeaseID, error) {
 }
 
 func (server *APIServer) KeepAliveLease(c echo.Context) error {
-	leaseId, err := parseLeaseId(c.P(0))
+	leaseId, err := parseLeaseId(c.ParamValues()[0])
 	if err != nil {
 		return err
 	}
@@ -53,7 +54,7 @@ func (server *APIServer) KeepAliveLease(c echo.Context) error {
 }
 
 func (server *APIServer) RevokeLease(c echo.Context) error {
-	leaseId, err := parseLeaseId(c.P(0))
+	leaseId, err := parseLeaseId(c.ParamValues()[0])
 	if err != nil {
 		return err
 	}

@@ -1,16 +1,17 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"flag"
+	"math/big"
+	"time"
+
 	"github.com/golang/glog"
 	"github.com/google/subcommands"
 	"github.com/infrmods/xbus/utils"
-	"golang.org/x/net/context"
-	"math/big"
-	"time"
 )
 
 type GenRootCmd struct {

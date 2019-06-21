@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"time"
@@ -8,7 +9,6 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
-	"golang.org/x/net/context"
 )
 
 var rValidName = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]{5,}$`)

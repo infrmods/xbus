@@ -2,13 +2,15 @@ package main
 
 import (
 	"flag"
+	"os"
+
+	"context"
+
 	"github.com/golang/glog"
 	"github.com/google/subcommands"
 	"github.com/infrmods/xbus/api"
 	"github.com/infrmods/xbus/configs"
 	"github.com/infrmods/xbus/services"
-	"golang.org/x/net/context"
-	"os"
 )
 
 type RunCommand struct {
@@ -40,12 +42,8 @@ func (cmd *RunCommand) Execute(_ context.Context, f *flag.FlagSet, _ ...interfac
 	}
 	configs := configs.NewConfigCtrl(&x.Config.Configs, db, etcdClient)
 	apiServer := api.NewAPIServer(&x.Config.Api, etcdClient, services, configs, x.NewAppCtrl(db))
-	if err := apiServer.Start(); err != nil {
+	if err := apiServer.Run(); err != nil {
 		glog.Errorf("start api_sersver fail: %v", err)
-		os.Exit(-1)
-	}
-	if err := apiServer.Wait(); err != nil {
-		glog.Errorf("wait api_server fail: %v", err)
 		os.Exit(-1)
 	}
 	return subcommands.ExitSuccess

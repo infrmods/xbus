@@ -1,14 +1,15 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"os"
+	"text/tabwriter"
+
 	"github.com/golang/glog"
 	"github.com/google/subcommands"
 	"github.com/infrmods/xbus/apps"
-	"golang.org/x/net/context"
-	"os"
-	"text/tabwriter"
 )
 
 type ListAppCmd struct{}

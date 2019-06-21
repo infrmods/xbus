@@ -8,7 +8,7 @@ import (
 )
 
 func (server *APIServer) GetAppCert(c echo.Context) error {
-	app, err := server.apps.GetAppByName(c.P(0))
+	app, err := server.apps.GetAppByName(c.ParamValues()[0])
 	if err != nil {
 		return JsonError(c, err)
 	}

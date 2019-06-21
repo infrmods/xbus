@@ -1,12 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+
 	"github.com/golang/glog"
 	"github.com/google/subcommands"
 	"github.com/infrmods/xbus/apps"
-	"golang.org/x/net/context"
 )
 
 type GrantCmd struct {
