@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -98,13 +99,7 @@ func (server *APIServer) Run() error {
 		}
 	}
 	go func() {
-		var err error
-		if useTLS {
-			err = server.e.StartTLS(addr, server.config.CertFile, server.config.KeyFile)
-		} else {
-			err = server.e.Start(addr)
-		}
-		if err == http.ErrServerClosed {
+		if err := server.start(); err == http.ErrServerClosed {
 			glog.Info("shutting down the server")
 		} else if err != nil {
 			glog.Fatal(err)
@@ -117,6 +112,36 @@ func (server *APIServer) Run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	return server.e.Shutdown(ctx)
+}
+
+func (server *APIServer) start() (err error) {
+	useTLS := server.config.CertFile != ""
+	var s *http.Server
+	if useTLS {
+		s = server.e.TLSServer
+		s.TLSConfig = new(tls.Config)
+		s.TLSConfig.ClientCAs = server.apps.GetAppCertPool()
+		s.TLSConfig.Certificates = make([]tls.Certificate, 1)
+		s.TLSConfig.ClientAuth = tls.VerifyClientCertIfGiven
+		s.TLSConfig.Certificates[0], err = tls.LoadX509KeyPair(server.config.CertFile, server.config.KeyFile)
+		if err != nil {
+			return
+		}
+		if !server.e.DisableHTTP2 {
+			s.TLSConfig.NextProtos = append(s.TLSConfig.NextProtos, "h2")
+		}
+	} else {
+		s = server.e.Server
+	}
+	s.Addr = server.config.Listen
+	if !strings.Contains(s.Addr, ":") {
+		if useTLS {
+			s.Addr += ":https"
+		} else {
+			s.Addr += ":http"
+		}
+	}
+	return server.e.StartServer(s)
 }
 
 func (server *APIServer) getRemoteIP(c echo.Context) net.IP {
