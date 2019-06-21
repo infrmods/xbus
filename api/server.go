@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
@@ -106,7 +107,7 @@ func (server *APIServer) Run() error {
 	}()
 
 	quit := make(chan os.Signal)
-	signal.Notify(quit, os.Interrupt)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 	ctx, cancel := context.WithTimeout(context.Background(), server.config.StopTimeout)
 	defer cancel()
