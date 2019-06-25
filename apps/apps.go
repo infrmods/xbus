@@ -1,18 +1,22 @@
 package apps
 
 import (
+	"context"
 	"crypto"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
-	"github.com/gocomm/dbutil"
-	_ "github.com/gocomm/dbutil/dialects/mysql"
-	"github.com/golang/glog"
-	"github.com/infrmods/xbus/utils"
+	"fmt"
 	"math/big"
 	"net"
 	"regexp"
 	"strings"
+
+	"github.com/coreos/etcd/clientv3"
+	"github.com/gocomm/dbutil"
+	"github.com/golang/glog"
+	"github.com/infrmods/xbus/utils"
+	"google.golang.org/grpc/codes"
 )
 
 var SERIAL_CONFIG_ITEM = "cert_serial"
@@ -69,20 +73,22 @@ type Config struct {
 	EcdsaCruve   string
 	RSABits      int    `default:"2048"`
 	Organization string `default:"XBus"`
+	KeyPrefix    string `default:"/apps" yaml:"key_prefix"`
 }
 
 type AppCtrl struct {
 	config       *Config
 	db           *sql.DB
 	CertsManager *CertsCtrl
+	etcdClient   *clientv3.Client
 }
 
-func NewAppCtrl(config *Config, db *sql.DB) (*AppCtrl, error) {
+func NewAppCtrl(config *Config, db *sql.DB, etcdClient *clientv3.Client) (*AppCtrl, error) {
 	certs, err := NewCertsCtrl(&config.Cert, &DBSerialGenerator{db})
 	if err != nil {
 		return nil, err
 	}
-	return &AppCtrl{config: config, db: db, CertsManager: certs}, nil
+	return &AppCtrl{config: config, db: db, CertsManager: certs, etcdClient: etcdClient}, nil
 }
 
 func (ctrl *AppCtrl) GetAppCertPool() *x509.CertPool {
@@ -263,4 +269,39 @@ func (ctrl *AppCtrl) HasAnyPrefixPerm(typ int, appId int64, groupIds []int64, ne
 			typ, appId, groupIds, needWrite, content, err)
 		return false, utils.NewSystemError("get perm fail")
 	}
+}
+
+type AppNode struct {
+	Address string `json:"address"`
+	Label   string `json:"label"`
+	Config  string `json:"config"`
+}
+
+func (ctrl *AppCtrl) PlugAppNode(ctx context.Context, appName string, node *AppNode, leaseID clientv3.LeaseID) (bool, error) {
+	if node.Address == "" {
+		return false, utils.Errorf(utils.EcodeInvalidAddress, "invalid app node address(empty)")
+	}
+	if node.Config == "" {
+		return false, utils.Errorf(utils.EcodeInvalidValue, "invalid app node config(empty)")
+	}
+	label := node.Label
+	if label == "" {
+		label = "default"
+	}
+
+	key := fmt.Sprintf("%s/%s/%s/node_%s", ctrl.config.KeyPrefix, appName, label, node.Address)
+	newAppNode := false
+	resp, err := ctrl.etcdClient.Get(ctx, key)
+	if err != nil {
+		if utils.GetErrCode(err) != codes.NotFound {
+			return false, utils.CleanErr(err, "get app node fail", "get app node fail: %v", err)
+		}
+		newAppNode = true
+	} else {
+		newAppNode = len(resp.Kvs) == 0
+	}
+	if _, err := ctrl.etcdClient.Put(ctx, key, node.Config, clientv3.WithLease(leaseID)); err != nil {
+		return false, utils.CleanErr(err, "put app node fail", "put app node fail: %v", err)
+	}
+	return newAppNode, nil
 }

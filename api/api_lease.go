@@ -6,13 +6,15 @@ import (
 	"strconv"
 
 	"github.com/coreos/etcd/clientv3"
+	"github.com/infrmods/xbus/apps"
 	"github.com/infrmods/xbus/utils"
 	"github.com/labstack/echo/v4"
 )
 
 type LeaseGrantResult struct {
-	TTL     int64            `json:"ttl"`
-	LeaseId clientv3.LeaseID `json:"lease_id"`
+	TTL        int64            `json:"ttl"`
+	LeaseID    clientv3.LeaseID `json:"lease_id"`
+	NewAppNode bool             `json:"new_app_node"`
 }
 
 func (server *APIServer) GrantLease(c echo.Context) error {
@@ -23,10 +25,31 @@ func (server *APIServer) GrantLease(c echo.Context) error {
 	if ttl > 0 && ttl < _MinServiceTTL {
 		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
 	}
-	if rep, err := server.etcdClient.Grant(context.Background(), ttl); err == nil {
+	app := server.app(c)
+	var appNode *apps.AppNode
+	if c.FormValue("app_node") != "" {
+		var value apps.AppNode
+		ok, err := JsonFormParam(c, "app_node", &value)
+		if !ok {
+			return err
+		}
+		appNode = &value
+	}
+	if appNode != nil && app == nil {
+		return JsonErrorf(c, utils.EcodeInvalidParam, "missing app config")
+	}
+	ctx := context.Background()
+	if rep, err := server.etcdClient.Grant(ctx, ttl); err == nil {
+		newAppNode := false
+		if appNode != nil {
+			if newAppNode, err = server.apps.PlugAppNode(ctx, app.Name, appNode, rep.ID); err != nil {
+				return JsonError(c, err)
+			}
+		}
 		return JsonResult(c, LeaseGrantResult{
-			TTL:     rep.TTL,
-			LeaseId: rep.ID,
+			TTL:        rep.TTL,
+			LeaseID:    rep.ID,
+			NewAppNode: newAppNode,
 		})
 	} else {
 		return JsonError(c, utils.CleanErr(err, "grant lease fail", "grant lease(ttl: %d) fail: %v", ttl, err))

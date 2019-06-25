@@ -18,6 +18,8 @@ import (
 	"github.com/infrmods/xbus/services"
 	"github.com/infrmods/xbus/utils"
 	"gopkg.in/yaml.v2"
+
+	_ "github.com/gocomm/dbutil/dialects/mysql"
 )
 
 type Config struct {
@@ -90,8 +92,8 @@ func (x *XBus) NewEtcdClient() *clientv3.Client {
 	return etcdClient
 }
 
-func (x *XBus) NewAppCtrl(db *sql.DB) *apps.AppCtrl {
-	appCtrl, err := apps.NewAppCtrl(&x.Config.Apps, db)
+func (x *XBus) NewAppCtrl(db *sql.DB, etcdClient *clientv3.Client) *apps.AppCtrl {
+	appCtrl, err := apps.NewAppCtrl(&x.Config.Apps, db, etcdClient)
 	if err != nil {
 		glog.Errorf("create appsCtrl fail: %v", err)
 		os.Exit(-1)

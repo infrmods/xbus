@@ -47,7 +47,7 @@ func (cmd *ListPerm) SetFlags(f *flag.FlagSet) {
 func (cmd *ListPerm) Execute(_ context.Context, f *flag.FlagSet, v ...interface{}) subcommands.ExitStatus {
 	x := NewXBus()
 	db := x.NewDB()
-	app_ctrl := x.NewAppCtrl(db)
+	app_ctrl := x.NewAppCtrl(db, x.NewEtcdClient())
 
 	app_list, err := apps.GetAppList(db)
 	if err != nil {

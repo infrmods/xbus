@@ -209,6 +209,10 @@ func (server *APIServer) appName(c echo.Context) string {
 	return "null"
 }
 
+func (server *APIServer) app(c echo.Context) *apps.App {
+	return c.Get("app").(*apps.App)
+}
+
 func (server *APIServer) newNotPermittedResp(c echo.Context, keys ...string) error {
 	msg := fmt.Sprintf("not permitted: [%s] %s", server.appName(c), strings.Join(keys, ", "))
 	return JsonError(c, utils.NewNotPermittedError(msg, keys))

@@ -81,7 +81,7 @@ func (cmd *NewAppCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface
 	}
 
 	x := NewXBus()
-	appCtrl := x.NewAppCtrl(x.NewDB())
+	appCtrl := x.NewAppCtrl(x.NewDB(), x.NewEtcdClient())
 	app := apps.App{Status: utils.StatusOk, Name: appName,
 		Description: cmd.Description}
 	if _, err := appCtrl.NewApp(&app, privKey, strings.Split(cmd.DNSNames, ","), ips, cmd.Days); err != nil {
