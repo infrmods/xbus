@@ -277,6 +277,8 @@ type AppNode struct {
 	Config  string `json:"config"`
 }
 
+const holdValue = "{}"
+
 func (ctrl *AppCtrl) PlugAppNode(ctx context.Context, appName string, node *AppNode, leaseID clientv3.LeaseID) (bool, error) {
 	if node.Address == "" {
 		return false, utils.Errorf(utils.EcodeInvalidAddress, "invalid app node address(empty)")
@@ -289,19 +291,26 @@ func (ctrl *AppCtrl) PlugAppNode(ctx context.Context, appName string, node *AppN
 		label = "default"
 	}
 
-	key := fmt.Sprintf("%s/%s/%s/node_%s", ctrl.config.KeyPrefix, appName, label, node.Address)
-	newAppNode := false
-	resp, err := ctrl.etcdClient.Get(ctx, key)
+	holdKey := fmt.Sprintf("%s/%s/%s/node_%s", ctrl.config.KeyPrefix, appName, label, node.Address)
+	if _, err := ctrl.etcdClient.Txn(ctx).If(
+		clientv3.Compare(clientv3.Value(holdKey), "=", holdValue)).Else(
+		clientv3.OpPut(holdKey, holdValue)).Commit(); err != nil {
+		return false, utils.CleanErr(err, "put app holdKey fail", "put app holdKey faial: %v", err)
+	}
+
+	onlineKey := fmt.Sprintf("%s/%s/%s/node_%s/online", ctrl.config.KeyPrefix, appName, label, node.Address)
+	newOnlineNode := false
+	resp, err := ctrl.etcdClient.Get(ctx, onlineKey)
 	if err != nil {
 		if utils.GetErrCode(err) != codes.NotFound {
-			return false, utils.CleanErr(err, "get app node fail", "get app node fail: %v", err)
+			return false, utils.CleanErr(err, "get app onlineNode fail", "get app onlineNode fail: %v", err)
 		}
-		newAppNode = true
+		newOnlineNode = true
 	} else {
-		newAppNode = len(resp.Kvs) == 0
+		newOnlineNode = len(resp.Kvs) == 0
 	}
-	if _, err := ctrl.etcdClient.Put(ctx, key, node.Config, clientv3.WithLease(leaseID)); err != nil {
-		return false, utils.CleanErr(err, "put app node fail", "put app node fail: %v", err)
+	if _, err := ctrl.etcdClient.Put(ctx, onlineKey, node.Config, clientv3.WithLease(leaseID)); err != nil {
+		return false, utils.CleanErr(err, "put app onlineNode fail", "put app onlineNode fail: %v", err)
 	}
-	return newAppNode, nil
+	return newOnlineNode, nil
 }
