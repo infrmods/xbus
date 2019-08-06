@@ -314,6 +314,7 @@ func (server *APIServer) registerConfigAPIs(g *echo.Group) {
 
 func (server *APIServer) registerAppAPIs(g *echo.Group) {
 	g.GET("/:name/cert", echo.HandlerFunc(server.GetAppCert))
+	g.GET("/:name/nodes", echo.HandlerFunc(server.watchAppNodes))
 	g.GET("", echo.HandlerFunc(server.ListApp))
 	g.PUT("", echo.HandlerFunc(server.NewApp))
 }

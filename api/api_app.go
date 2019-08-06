@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/apps"
 	"github.com/infrmods/xbus/utils"
@@ -77,6 +79,23 @@ func (server *APIServer) NewApp(c echo.Context) error {
 		return JsonResult(c, app)
 	} else {
 		glog.Errorf("create app fail: %v", err)
+		return JsonError(c, err)
+	}
+}
+
+func (server *APIServer) watchAppNodes(c echo.Context) error {
+	revision, ok, err := IntQueryParamD(c, "revision", 0)
+	if !ok {
+		return err
+	}
+	appName := c.ParamValues()[0]
+	label := c.QueryParam("label")
+	if label == "" {
+		label = "default"
+	}
+	if nodes, err := server.apps.WatchAppNodes(context.Background(), appName, label, revision); err == nil {
+		return JsonResult(c, nodes)
+	} else {
 		return JsonError(c, err)
 	}
 }

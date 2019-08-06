@@ -81,6 +81,22 @@ func (server *APIServer) RevokeLease(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	appNodeName := c.QueryParam("app_node")
+	if appNodeName != "" {
+		address := c.QueryParam("app_node_address")
+		if address == "" {
+			return JsonErrorC(c, http.StatusBadRequest,
+				utils.Errorf(utils.EcodeMissingParam, "missing app_node_address"))
+		}
+		label := c.QueryParam("app_node_label")
+		if label == "" {
+			label = "default"
+		}
+		if err := server.apps.RemoveAppNode(context.Background(), appNodeName, label, address); err != nil {
+			return JsonError(c, err)
+		}
+	}
+
 	if _, err := server.etcdClient.Revoke(context.Background(), leaseId); err == nil {
 		return JsonOk(c)
 	} else {

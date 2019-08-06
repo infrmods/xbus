@@ -314,3 +314,51 @@ func (ctrl *AppCtrl) PlugAppNode(ctx context.Context, appName string, node *AppN
 	}
 	return newOnlineNode, nil
 }
+
+type AppNodes struct {
+	Nodes    map[string]*string `json:"nodes"`
+	Revision int64              `json:"revision"`
+}
+
+var rNodeKey = regexp.MustCompile(`/node_([^/]+)$`)
+var rNodeOnlineKey = regexp.MustCompile(`/node_([^/]+)/online$`)
+
+func (ctrl *AppCtrl) queryAppNodes(ctx context.Context, name, label string) (*AppNodes, error) {
+	key := fmt.Sprintf("%s/%s/%s/", ctrl.config.KeyPrefix, name, label)
+	if resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix()); err == nil {
+		nodes := make(map[string]*string)
+		for _, kv := range resp.Kvs {
+			if matches := rNodeKey.FindStringSubmatch(string(kv.Key)); matches != nil {
+				_, ok := nodes[matches[0]]
+				if !ok {
+					nodes[matches[0]] = nil
+				}
+			} else if matches = rNodeOnlineKey.FindStringSubmatch(string(kv.Key)); matches != nil {
+				config := string(kv.Value)
+				nodes[matches[0]] = &config
+			}
+		}
+		return &AppNodes{Nodes: nodes, Revision: resp.Header.Revision}, nil
+	} else {
+		return nil, utils.CleanErr(err, "query fail", "query app nodes fail: %v", err)
+	}
+}
+
+func (ctrl *AppCtrl) WatchAppNodes(ctx context.Context, name, label string, revision int64) (*AppNodes, error) {
+	key := fmt.Sprintf("%s/%s/%s/", ctrl.config.KeyPrefix, name, label)
+	if revision > 0 {
+		watcher := clientv3.NewWatcher(ctrl.etcdClient)
+		defer watcher.Close()
+		<-watcher.Watch(ctx, key, clientv3.WithPrefix(), clientv3.WithRev(revision))
+	}
+
+	return ctrl.queryAppNodes(ctx, name, label)
+}
+
+func (ctrl *AppCtrl) RemoveAppNode(ctx context.Context, name, label, address string) error {
+	key := fmt.Sprintf("%s/%s/%s/node_%s", ctrl.config.KeyPrefix, name, label, address)
+	if _, err := ctrl.etcdClient.Delete(ctx, key); err != nil {
+		return utils.CleanErr(err, "delete app node fail", "delete app node fail: %v", err)
+	}
+	return nil
+}
