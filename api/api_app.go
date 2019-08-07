@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/apps"
@@ -9,21 +10,21 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func (server *APIServer) GetAppCert(c echo.Context) error {
+func (server *Server) getAppCert(c echo.Context) error {
 	app, err := server.apps.GetAppByName(c.ParamValues()[0])
 	if err != nil {
-		return JsonError(c, err)
+		return JSONError(c, err)
 	}
-	return JsonResult(c, app.Cert)
+	return JSONResult(c, app.Cert)
 }
 
-type ListAppResult struct {
+type listAppResult struct {
 	Apps  []apps.App `json:"apps"`
 	Skip  int        `json:"skip"`
 	Limit int        `json:"limit"`
 }
 
-func (server *APIServer) ListApp(c echo.Context) error {
+func (server *Server) listApp(c echo.Context) error {
 	if ok, err := server.checkPerm(c, apps.PermTypeApp, false, ""); err == nil {
 		if !ok {
 			return server.newNotPermittedResp(c, "app perm")
@@ -40,21 +41,21 @@ func (server *APIServer) ListApp(c echo.Context) error {
 		return err
 	}
 
-	if apps, err := server.apps.ListApp(int(skip), int(limit)); err == nil {
-		return JsonResult(c, ListAppResult{Apps: apps, Skip: int(skip), Limit: int(limit)})
-	} else {
-		return JsonError(c, err)
+	apps, err := server.apps.ListApp(int(skip), int(limit))
+	if err != nil {
+		return JSONError(c, err)
 	}
+	return JSONResult(c, listAppResult{Apps: apps, Skip: int(skip), Limit: int(limit)})
 }
 
-type NewAppRequest struct {
+type newAppRequest struct {
 	Name        string `json:"name" form:"name"`
 	Description string `json:"description" form:"description"`
 	KeyBits     int    `json:"key_bits" form:"key_bits"`
 	Days        int    `json:"days" form:"days"`
 }
 
-func (server *APIServer) NewApp(c echo.Context) error {
+func (server *Server) newApp(c echo.Context) error {
 	if ok, err := server.checkPerm(c, apps.PermTypeApp, false, ""); err == nil {
 		if !ok {
 			return server.newNotPermittedResp(c, "app perm")
@@ -62,40 +63,48 @@ func (server *APIServer) NewApp(c echo.Context) error {
 	} else {
 		return err
 	}
-	var req NewAppRequest
+	var req newAppRequest
 	if err := c.Bind(&req); err != nil {
 		return err
 	}
 	privKey, err := utils.NewPrivateKey("", req.KeyBits)
 	if err != nil {
 		glog.Errorf("generate private key fail: %v", err)
-		return JsonErrorf(c, "SYSTEM_BUSY", "create private key fail")
+		return JSONErrorf(c, "SYSTEM_BUSY", "create private key fail")
 	}
 	app := apps.App{
 		Status:      utils.StatusOk,
 		Name:        req.Name,
 		Description: req.Description}
-	if _, err := server.apps.NewApp(&app, privKey, nil, nil, req.Days); err == nil {
-		return JsonResult(c, app)
-	} else {
+	_, err = server.apps.NewApp(&app, privKey, nil, nil, req.Days)
+	if err != nil {
 		glog.Errorf("create app fail: %v", err)
-		return JsonError(c, err)
+		return JSONError(c, err)
 	}
+	return JSONResult(c, app)
 }
 
-func (server *APIServer) watchAppNodes(c echo.Context) error {
+func (server *Server) watchAppNodes(c echo.Context) error {
 	revision, ok, err := IntQueryParamD(c, "revision", 0)
 	if !ok {
 		return err
 	}
+	timeout, ok, err := IntQueryParamD(c, "timeout", _DefaultWatchTimeout)
+	if !ok {
+		return err
+	}
+	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancelFunc()
+
 	appName := c.ParamValues()[0]
 	label := c.QueryParam("label")
 	if label == "" {
 		label = "default"
 	}
-	if nodes, err := server.apps.WatchAppNodes(context.Background(), appName, label, revision); err == nil {
-		return JsonResult(c, nodes)
-	} else {
-		return JsonError(c, err)
+
+	nodes, err := server.apps.WatchAppNodes(ctx, appName, label, revision)
+	if err != nil {
+		return JSONError(c, err)
 	}
+	return JSONResult(c, nodes)
 }

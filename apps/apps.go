@@ -19,20 +19,20 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-var SERIAL_CONFIG_ITEM = "cert_serial"
+var serialConfigItem = "cert_serial"
 
-type DBSerialGenerator struct {
+type dbSerialGenerator struct {
 	db *sql.DB
 }
 
-func (g *DBSerialGenerator) Generate() (*big.Int, error) {
+func (g *dbSerialGenerator) Generate() (*big.Int, error) {
 	var item *ConfigItem
 	var err error
 	for iter := 0; iter < 2; iter++ {
-		if item, err = GetConfigItem(g.db, SERIAL_CONFIG_ITEM); err == nil {
+		if item, err = GetConfigItem(g.db, serialConfigItem); err == nil {
 			break
 		} else if err == sql.ErrNoRows {
-			item = &ConfigItem{Name: SERIAL_CONFIG_ITEM, Ver: 1}
+			item = &ConfigItem{Name: serialConfigItem, Ver: 1}
 			item.SetIntValue(2)
 			if new, err := InsertConfigItem(g.db, item); err != nil {
 				glog.Errorf("insert config item(%#v) fail: %v", *item, err)
@@ -44,7 +44,7 @@ func (g *DBSerialGenerator) Generate() (*big.Int, error) {
 				return nil, utils.NewSystemError("generate serial fail")
 			}
 		} else {
-			glog.Errorf("get serial config(%s) fail: %v", SERIAL_CONFIG_ITEM, err)
+			glog.Errorf("get serial config(%s) fail: %v", serialConfigItem, err)
 			return nil, utils.NewSystemError("generate serial fail")
 		}
 	}
@@ -52,7 +52,7 @@ func (g *DBSerialGenerator) Generate() (*big.Int, error) {
 	for i := 0; i < 32; i++ {
 		n, err := item.GetIntValue()
 		if err != nil {
-			glog.Errorf("get serial(%s) value fail: %v", SERIAL_CONFIG_ITEM, err)
+			glog.Errorf("get serial(%s) value fail: %v", serialConfigItem, err)
 			return nil, utils.NewSystemError("generate serial fail")
 		}
 		item.SetIntValue(n + 1)
@@ -61,13 +61,14 @@ func (g *DBSerialGenerator) Generate() (*big.Int, error) {
 		} else if err == dbutil.ZeroEffected {
 			continue
 		} else {
-			glog.Errorf("update serial(%s) fail: %v", SERIAL_CONFIG_ITEM, err)
+			glog.Errorf("update serial(%s) fail: %v", serialConfigItem, err)
 			return nil, utils.NewSystemError("generate serial fail")
 		}
 	}
 	return nil, utils.NewError(utils.EcodeTooManyAttempts, "loop exceeded")
 }
 
+// Config module config
 type Config struct {
 	Cert         CertsConfig
 	EcdsaCruve   string
@@ -76,6 +77,7 @@ type Config struct {
 	KeyPrefix    string `default:"/apps" yaml:"key_prefix"`
 }
 
+// AppCtrl app ctrl
 type AppCtrl struct {
 	config       *Config
 	db           *sql.DB
@@ -83,20 +85,23 @@ type AppCtrl struct {
 	etcdClient   *clientv3.Client
 }
 
+// NewAppCtrl new app ctrl
 func NewAppCtrl(config *Config, db *sql.DB, etcdClient *clientv3.Client) (*AppCtrl, error) {
-	certs, err := NewCertsCtrl(&config.Cert, &DBSerialGenerator{db})
+	certs, err := NewCertsCtrl(&config.Cert, &dbSerialGenerator{db})
 	if err != nil {
 		return nil, err
 	}
 	return &AppCtrl{config: config, db: db, CertsManager: certs, etcdClient: etcdClient}, nil
 }
 
+// GetAppCertPool get app certPool
 func (ctrl *AppCtrl) GetAppCertPool() *x509.CertPool {
 	return ctrl.CertsManager.CertPool()
 }
 
 var rAppName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-_]+$`)
 
+// NewApp new app
 func (ctrl *AppCtrl) NewApp(app *App, key crypto.Signer, dnsNames []string, ips []net.IP, days int) (crypto.Signer, error) {
 	if !rAppName.MatchString(app.Name) {
 		return nil, utils.Errorf(utils.EcodeInvalidName, "invalid app name: %s", app.Name)
@@ -126,12 +131,12 @@ func (ctrl *AppCtrl) NewApp(app *App, key crypto.Signer, dnsNames []string, ips 
 		return nil, utils.NewSystemError("generate cert fail")
 	}
 
-	if data, err := utils.EncodePrivateKeyToPem(key); err == nil {
-		app.PrivateKey = data
-	} else {
-		glog.Errorf("encode private key to pem fail: {}", err)
+	data, err := utils.EncodePrivateKeyToPem(key)
+	if err != nil {
+		glog.Errorf("encode private key to pem fail: %v", err)
 		return nil, utils.NewSystemError("encode private key pem fail")
 	}
+	app.PrivateKey = data
 
 	if err := InsertApp(ctrl.db, app); err != nil {
 		if err == dbutil.ZeroEffected {
@@ -144,64 +149,69 @@ func (ctrl *AppCtrl) NewApp(app *App, key crypto.Signer, dnsNames []string, ips 
 	return key, nil
 }
 
-func (ctrl *AppCtrl) GetPerms(typ int, app_name *string, group_name *string, can_write *bool, prefix *string) ([]Perm, error) {
-	var target_type *int
-	var target_id *int64
-	if app_name != nil {
-		if app, err := GetAppByName(ctrl.db, *app_name); err == nil {
+// GetPerms get perms
+func (ctrl *AppCtrl) GetPerms(typ int, appName *string, groupName *string, canWrite *bool, prefix *string) ([]Perm, error) {
+	var targetType *int
+	var targetID *int64
+	if appName != nil {
+		if app, err := GetAppByName(ctrl.db, *appName); err == nil {
 			t := PermTargetApp
-			target_type = &t
-			target_id = &app.Id
+			targetType = &t
+			targetID = &app.ID
 		} else {
-			glog.Errorf("get app(%s) fail: %v", app_name, err)
+			glog.Errorf("get app(%s) fail: %v", *appName, err)
 			return nil, utils.NewSystemError("get app fail")
 		}
-	} else if group_name != nil {
-		if group, err := GetGroupByName(ctrl.db, *group_name); err == nil {
+	} else if groupName != nil {
+		if group, err := GetGroupByName(ctrl.db, *groupName); err == nil {
 			t := PermTargetGroup
-			target_type = &t
-			target_id = &group.Id
+			targetType = &t
+			targetID = &group.ID
 		} else {
-			glog.Errorf("get group(%s) fail: %v", group_name, err)
+			glog.Errorf("get group(%s) fail: %v", *groupName, err)
 			return nil, utils.NewSystemError("get group fail")
 		}
 	}
 
-	if perms, err := GetPerms(ctrl.db, typ, target_type, target_id, can_write, prefix); err == nil {
-		return perms, nil
-	} else {
+	perms, err := GetPerms(ctrl.db, typ, targetType, targetID, canWrite, prefix)
+	if err != nil {
 		glog.Errorf("get perms fail: %v", err)
 		return nil, utils.NewSystemError("get perms fail")
 	}
+	return perms, nil
 }
 
+// GetAppByName get app byname
 func (ctrl *AppCtrl) GetAppByName(name string) (*App, error) {
-	if app, err := GetAppByName(ctrl.db, name); err == nil {
-		return app, nil
-	} else {
+	app, err := GetAppByName(ctrl.db, name)
+	if err != nil {
 		glog.Errorf("get app(%s) fail: %v", name, err)
 		return nil, utils.NewSystemError("get app fail")
 	}
+	return app, nil
 }
 
+// ListApp list app
 func (ctrl *AppCtrl) ListApp(skip, limit int) ([]App, error) {
-	if apps, err := ListApp(ctrl.db, skip, limit); err == nil {
-		return apps, nil
-	} else {
+	apps, err := ListApp(ctrl.db, skip, limit)
+	if err != nil {
 		glog.Errorf("list app fail: %v", err)
 		return nil, utils.NewSystemError("list app fail")
 	}
+	return apps, nil
 }
 
+// GetAppGroupByName get app group byname
 func (ctrl *AppCtrl) GetAppGroupByName(name string) (*App, []int64, error) {
-	if app, groupIds, err := GetAppGroupByName(ctrl.db, name); err == nil {
-		return app, groupIds, nil
-	} else {
+	app, groupIDs, err := GetAppGroupByName(ctrl.db, name)
+	if err != nil {
 		glog.Errorf("get app&group(%s) fail: %v", name, err)
 		return nil, nil, utils.NewSystemError("get app&group fail")
 	}
+	return app, groupIDs, nil
 }
 
+// NewGroup new group
 func (ctrl *AppCtrl) NewGroup(group *Group) error {
 	if err := InsertGroup(ctrl.db, group); err == nil {
 		return nil
@@ -213,64 +223,70 @@ func (ctrl *AppCtrl) NewGroup(group *Group) error {
 	}
 }
 
+// GetGroupByName get group byname
 func (ctrl *AppCtrl) GetGroupByName(name string) (*Group, error) {
-	if group, err := GetGroupByName(ctrl.db, name); err == nil {
-		return group, nil
-	} else {
+	group, err := GetGroupByName(ctrl.db, name)
+	if err != nil {
 		glog.Errorf("get group(%s) fail: %v", name, err)
 		return nil, utils.NewSystemError("get group fail")
 	}
+	return group, nil
 }
 
-func (ctrl *AppCtrl) AddGroupMember(groupId, appId int64) error {
-	if err := NewGroupMember(ctrl.db, groupId, appId); err != nil {
-		glog.Errorf("add group member(group: %d, app: %d) fail: %v", groupId, appId, err)
+// AddGroupMember add group member
+func (ctrl *AppCtrl) AddGroupMember(groupID, appID int64) error {
+	if err := NewGroupMember(ctrl.db, groupID, appID); err != nil {
+		glog.Errorf("add group member(group: %d, app: %d) fail: %v", groupID, appID, err)
 		return utils.NewSystemError("add member fail")
 	}
 	return nil
 }
 
-func (ctrl *AppCtrl) GetGroupMembers(groupId int64) ([]App, error) {
-	if apps, err := GetGroupMembers(ctrl.db, groupId); err == nil {
-		return apps, nil
-	} else {
-		glog.Errorf("get group(%d) members fail: %v", groupId, err)
+// GetGroupMembers get group members
+func (ctrl *AppCtrl) GetGroupMembers(groupID int64) ([]App, error) {
+	apps, err := GetGroupMembers(ctrl.db, groupID)
+	if err != nil {
+		glog.Errorf("get group(%d) members fail: %v", groupID, err)
 		return nil, utils.NewSystemError("get group members fail")
 	}
+	return apps, nil
 }
 
-func (ctrl *AppCtrl) NewGroupPerm(permType int, groupId int64, canWrite bool, content string) (int64, error) {
+// NewGroupPerm new group perm
+func (ctrl *AppCtrl) NewGroupPerm(permType int, groupID int64, canWrite bool, content string) (int64, error) {
 	perm := Perm{PermType: permType, TargetType: PermTargetGroup,
-		TargetId: groupId, CanWrite: canWrite, Content: content}
-	if err := InsertPerm(ctrl.db, &perm); err == nil {
-		return perm.Id, nil
-	} else {
+		TargetID: groupID, CanWrite: canWrite, Content: content}
+	err := InsertPerm(ctrl.db, &perm)
+	if err != nil {
 		glog.Errorf("new group perm fail: %v", err)
 		return 0, utils.NewSystemError("new group perm fail")
 	}
+	return perm.ID, nil
 }
 
-func (ctrl *AppCtrl) NewAppPerm(permType int, appId int64, canWrite bool, content string) (int64, error) {
+// NewAppPerm new app perm
+func (ctrl *AppCtrl) NewAppPerm(permType int, appID int64, canWrite bool, content string) (int64, error) {
 	perm := Perm{PermType: permType, TargetType: PermTargetApp,
-		TargetId: appId, CanWrite: canWrite, Content: content}
-	if err := InsertPerm(ctrl.db, &perm); err == nil {
-		return perm.Id, nil
-	} else {
+		TargetID: appID, CanWrite: canWrite, Content: content}
+	if err := InsertPerm(ctrl.db, &perm); err != nil {
 		glog.Errorf("new app perm fail: %v", err)
 		return 0, utils.NewSystemError("new app perm fail")
 	}
+	return perm.ID, nil
 }
 
-func (ctrl *AppCtrl) HasAnyPrefixPerm(typ int, appId int64, groupIds []int64, needWrite bool, content string) (bool, error) {
-	if has, err := HasAnyPrefixPerm(ctrl.db, typ, appId, groupIds, needWrite, content); err == nil {
-		return has, nil
-	} else {
+// HasAnyPrefixPerm has any prefix perm
+func (ctrl *AppCtrl) HasAnyPrefixPerm(typ int, appID int64, groupIDs []int64, needWrite bool, content string) (bool, error) {
+	has, err := HasAnyPrefixPerm(ctrl.db, typ, appID, groupIDs, needWrite, content)
+	if err != nil {
 		glog.Errorf("get hasAnyPrefixPerm(type:%d, app:%d, groups:%v, needWrite:%v, content:%v) fail: %v",
-			typ, appId, groupIds, needWrite, content, err)
+			typ, appID, groupIDs, needWrite, content, err)
 		return false, utils.NewSystemError("get perm fail")
 	}
+	return has, nil
 }
 
+// AppNode app node
 type AppNode struct {
 	Address string `json:"address"`
 	Label   string `json:"label"`
@@ -279,6 +295,7 @@ type AppNode struct {
 
 const holdValue = "{}"
 
+// PlugAppNode plug app node
 func (ctrl *AppCtrl) PlugAppNode(ctx context.Context, appName string, node *AppNode, leaseID clientv3.LeaseID) (bool, error) {
 	if node.Address == "" {
 		return false, utils.Errorf(utils.EcodeInvalidAddress, "invalid app node address(empty)")
@@ -315,6 +332,7 @@ func (ctrl *AppCtrl) PlugAppNode(ctx context.Context, appName string, node *AppN
 	return newOnlineNode, nil
 }
 
+// AppNodes app nodes
 type AppNodes struct {
 	Nodes    map[string]*string `json:"nodes"`
 	Revision int64              `json:"revision"`
@@ -325,25 +343,26 @@ var rNodeOnlineKey = regexp.MustCompile(`/node_([^/]+)/online$`)
 
 func (ctrl *AppCtrl) queryAppNodes(ctx context.Context, name, label string) (*AppNodes, error) {
 	key := fmt.Sprintf("%s/%s/%s/", ctrl.config.KeyPrefix, name, label)
-	if resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix()); err == nil {
-		nodes := make(map[string]*string)
-		for _, kv := range resp.Kvs {
-			if matches := rNodeKey.FindStringSubmatch(string(kv.Key)); matches != nil {
-				_, ok := nodes[matches[0]]
-				if !ok {
-					nodes[matches[0]] = nil
-				}
-			} else if matches = rNodeOnlineKey.FindStringSubmatch(string(kv.Key)); matches != nil {
-				config := string(kv.Value)
-				nodes[matches[0]] = &config
-			}
-		}
-		return &AppNodes{Nodes: nodes, Revision: resp.Header.Revision}, nil
-	} else {
+	resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix())
+	if err != nil {
 		return nil, utils.CleanErr(err, "query fail", "query app nodes fail: %v", err)
 	}
+	nodes := make(map[string]*string)
+	for _, kv := range resp.Kvs {
+		if matches := rNodeKey.FindStringSubmatch(string(kv.Key)); matches != nil {
+			_, ok := nodes[matches[1]]
+			if !ok {
+				nodes[matches[1]] = nil
+			}
+		} else if matches = rNodeOnlineKey.FindStringSubmatch(string(kv.Key)); matches != nil {
+			config := string(kv.Value)
+			nodes[matches[1]] = &config
+		}
+	}
+	return &AppNodes{Nodes: nodes, Revision: resp.Header.Revision}, nil
 }
 
+// WatchAppNodes watch app nodes
 func (ctrl *AppCtrl) WatchAppNodes(ctx context.Context, name, label string, revision int64) (*AppNodes, error) {
 	key := fmt.Sprintf("%s/%s/%s/", ctrl.config.KeyPrefix, name, label)
 	if revision > 0 {
@@ -355,6 +374,7 @@ func (ctrl *AppCtrl) WatchAppNodes(ctx context.Context, name, label string, revi
 	return ctrl.queryAppNodes(ctx, name, label)
 }
 
+// RemoveAppNode remove app node
 func (ctrl *AppCtrl) RemoveAppNode(ctx context.Context, name, label, address string) error {
 	key := fmt.Sprintf("%s/%s/%s/node_%s", ctrl.config.KeyPrefix, name, label, address)
 	if _, err := ctrl.etcdClient.Delete(ctx, key); err != nil {

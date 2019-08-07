@@ -2,8 +2,9 @@ package configs
 
 import (
 	"fmt"
-	"github.com/infrmods/xbus/utils"
 	"regexp"
+
+	"github.com/infrmods/xbus/utils"
 )
 
 var rValidName = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]{5,}$`)

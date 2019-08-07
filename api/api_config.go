@@ -11,16 +11,16 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type ListResult struct {
+type listResult struct {
 	Total   int64                `json:"total"`
 	Configs []configs.ConfigInfo `json:"configs"`
 	Skip    int                  `json:"skip"`
 	Limit   int                  `json:"limit"`
 }
 
-func (server *APIServer) ListConfig(c echo.Context) error {
+func (server *Server) listConfig(c echo.Context) error {
 	if c.QueryParam("keys") != "" {
-		return server.GetAllConfigs(c)
+		return server.getAllConfigs(c)
 	}
 
 	tag := c.QueryParam("tag")
@@ -34,90 +34,90 @@ func (server *APIServer) ListConfig(c echo.Context) error {
 		return err
 	}
 
-	if total, configs, err := server.configs.ListDBConfigs(context.Background(), tag, prefix, int(skip), int(limit)); err == nil {
-		return JsonResult(c,
-			ListResult{Total: total, Configs: configs, Skip: int(skip), Limit: int(limit)})
-	} else {
-		return JsonError(c, err)
+	total, configs, err := server.configs.ListDBConfigs(context.Background(), tag, prefix, int(skip), int(limit))
+	if err != nil {
+		return JSONError(c, err)
 	}
+	return JSONResult(c,
+		listResult{Total: total, Configs: configs, Skip: int(skip), Limit: int(limit)})
 }
 
-type ConfigQueryResult struct {
+type configQueryResult struct {
 	Config   *configs.ConfigItem `json:"config"`
 	Revision int64               `json:"revision"`
 }
 
-func (server *APIServer) GetConfig(c echo.Context) error {
+func (server *Server) getConfig(c echo.Context) error {
 	if c.QueryParam("watch") == "true" {
-		return server.Watch(c)
+		return server.watch(c)
 	}
 	node := c.Request().Header.Get("node")
 
-	if cfg, rev, err := server.configs.Get(context.Background(), server.appId(c), node, c.ParamValues()[0]); err == nil {
-		return JsonResult(c, ConfigQueryResult{Config: cfg, Revision: rev})
-	} else {
-		return JsonError(c, err)
+	cfg, rev, err := server.configs.Get(context.Background(), server.appID(c), node, c.ParamValues()[0])
+	if err != nil {
+		return JSONError(c, err)
 	}
+	return JSONResult(c, configQueryResult{Config: cfg, Revision: rev})
 }
 
-type ConfigsQueryResult struct {
+type configsQueryResult struct {
 	Configs  []*configs.ConfigItem `json:"configs"`
 	Revision int64                 `json:"revision"`
 }
 
-func (server *APIServer) GetAllConfigs(c echo.Context) error {
+func (server *Server) getAllConfigs(c echo.Context) error {
 	ks := c.QueryParam("keys")
 	if len(ks) == 0 {
-		return JsonErrorf(c, utils.EcodeMissingParam, "missing keys")
+		return JSONErrorf(c, utils.EcodeMissingParam, "missing keys")
 	}
 	var keys []string
 	if err := json.Unmarshal([]byte(ks), &keys); err != nil {
-		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid keys: %v", err)
+		return JSONErrorf(c, utils.EcodeInvalidParam, "invalid keys: %v", err)
 	}
-	not_permitted := make([]string, 0)
+	notPermitted := make([]string, 0)
 	for _, key := range keys {
 		if ok, err := server.checkPerm(c, apps.PermTypeConfig, false, key); err != nil {
-			return JsonError(c, err)
+			return JSONError(c, err)
 		} else if !ok {
-			not_permitted = append(not_permitted, key)
+			notPermitted = append(notPermitted, key)
 		}
 	}
-	if len(not_permitted) != 0 {
-		return server.newNotPermittedResp(c, not_permitted...)
+	if len(notPermitted) != 0 {
+		return server.newNotPermittedResp(c, notPermitted...)
 	}
 
 	node := c.Request().Header.Get("node")
-	result := ConfigsQueryResult{Configs: make([]*configs.ConfigItem, 0, len(keys)), Revision: 0}
+	result := configsQueryResult{Configs: make([]*configs.ConfigItem, 0, len(keys)), Revision: 0}
 	for _, key := range keys {
-		if cfg, rev, err := server.configs.Get(context.Background(), server.appId(c), node, key); err == nil {
+		if cfg, rev, err := server.configs.Get(context.Background(), server.appID(c), node, key); err == nil {
 			if result.Revision > 0 && rev < result.Revision {
 				result.Revision = rev
 			}
 			result.Configs = append(result.Configs, cfg)
 		} else {
-			return JsonError(c, err)
+			return JSONError(c, err)
 		}
 	}
-	return JsonResult(c, result)
+	return JSONResult(c, result)
 }
 
-func (server *APIServer) DeleteConfig(c echo.Context) error {
-	if err := server.configs.Delete(context.Background(), c.ParamValues()[0]); err == nil {
-		return JsonOk(c)
-	} else {
-		return JsonError(c, err)
+func (server *Server) deleteConfig(c echo.Context) error {
+	err := server.configs.Delete(context.Background(), c.ParamValues()[0])
+	if err != nil {
+		return JSONError(c, err)
 	}
+	return JSONOk(c)
 }
 
-type ConfigPutResult struct {
+type configPutResult struct {
 	Revision int64 `json:"revision"`
 }
 
-func (server *APIServer) PutConfig(c echo.Context) error {
+func (server *Server) putConfig(c echo.Context) error {
 	tag := c.FormValue("tag")
 	value := c.FormValue("value")
 	if value == "" {
-		return JsonErrorf(c, utils.EcodeInvalidValue, "invalid value")
+		return JSONErrorf(c, utils.EcodeInvalidValue, "invalid value")
 	}
 	version, ok, err := IntFormParamD(c, "version", 0)
 	if !ok {
@@ -125,14 +125,14 @@ func (server *APIServer) PutConfig(c echo.Context) error {
 	}
 	remark := c.FormValue("remark")
 
-	if rev, err := server.configs.Put(context.Background(), tag, c.ParamValues()[0], server.appId(c), remark, value, version); err == nil {
-		return JsonResult(c, ConfigPutResult{Revision: rev})
-	} else {
-		return JsonError(c, err)
+	rev, err := server.configs.Put(context.Background(), tag, c.ParamValues()[0], server.appID(c), remark, value, version)
+	if err != nil {
+		return JSONError(c, err)
 	}
+	return JSONResult(c, configPutResult{Revision: rev})
 }
 
-func (server *APIServer) Watch(c echo.Context) error {
+func (server *Server) watch(c echo.Context) error {
 	revision, ok, err := IntQueryParamD(c, "revision", 0)
 	if !ok {
 		return err
@@ -145,9 +145,9 @@ func (server *APIServer) Watch(c echo.Context) error {
 	defer cancelFunc()
 	node := c.Request().Header.Get("node")
 
-	if cfg, rev, err := server.configs.Watch(ctx, server.appId(c), node, c.ParamValues()[0], revision); err == nil {
-		return JsonResult(c, ConfigQueryResult{Config: cfg, Revision: rev})
-	} else {
-		return JsonError(c, err)
+	cfg, rev, err := server.configs.Watch(ctx, server.appID(c), node, c.ParamValues()[0], revision)
+	if err != nil {
+		return JSONError(c, err)
 	}
+	return JSONResult(c, configQueryResult{Config: cfg, Revision: rev})
 }

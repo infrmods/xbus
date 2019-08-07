@@ -12,6 +12,7 @@ import (
 	"github.com/infrmods/xbus/utils"
 )
 
+// NewAppCmd new app cmd
 type NewAppCmd struct {
 	Description string
 	DNSNames    string
@@ -24,18 +25,22 @@ type NewAppCmd struct {
 	KeyFile  string
 }
 
+// Name cmd name
 func (cmd *NewAppCmd) Name() string {
 	return "new-app"
 }
 
+// Synopsis cmd synopsis
 func (cmd *NewAppCmd) Synopsis() string {
 	return "create new app"
 }
 
+// Usage cmd usage
 func (cmd *NewAppCmd) Usage() string {
 	return "new-app [OPTIONS] name\n"
 }
 
+// SetFlags cmd set flags
 func (cmd *NewAppCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.Description, "desc", "", "app description")
 	f.StringVar(&cmd.DNSNames, "dns", "", "DNSNames, sparated by comma")
@@ -48,6 +53,7 @@ func (cmd *NewAppCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.KeyFile, "key-out", "", "key output path, default: {name}key.pem")
 }
 
+// Execute cmd execute
 func (cmd *NewAppCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface{}) subcommands.ExitStatus {
 	if f.NArg() != 1 {
 		f.Usage()

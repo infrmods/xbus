@@ -12,7 +12,8 @@ import (
 	"github.com/infrmods/xbus/apps"
 )
 
-type ListPerm struct {
+// ListPermCmd cmd list perm
+type ListPermCmd struct {
 	isConfigs  bool
 	isServices bool
 	isApps     bool
@@ -22,19 +23,23 @@ type ListPerm struct {
 	prefix     string
 }
 
-func (cmd *ListPerm) Name() string {
+// Name cmd name
+func (cmd *ListPermCmd) Name() string {
 	return "list-perm"
 }
 
-func (cmd *ListPerm) Synopsis() string {
+// Synopsis cmd synopsis
+func (cmd *ListPermCmd) Synopsis() string {
 	return "list perms"
 }
 
-func (cmd *ListPerm) Usage() string {
+// Usage cmd usage
+func (cmd *ListPermCmd) Usage() string {
 	return ""
 }
 
-func (cmd *ListPerm) SetFlags(f *flag.FlagSet) {
+// SetFlags cmd set flags
+func (cmd *ListPermCmd) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&cmd.isConfigs, "configs", false, "list config perms")
 	f.BoolVar(&cmd.isServices, "services", false, "list services perms")
 	f.BoolVar(&cmd.isApps, "apps", false, "list app perms")
@@ -44,28 +49,29 @@ func (cmd *ListPerm) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.prefix, "prefix", "", "content prefix")
 }
 
-func (cmd *ListPerm) Execute(_ context.Context, f *flag.FlagSet, v ...interface{}) subcommands.ExitStatus {
+// Execute cmd execute
+func (cmd *ListPermCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface{}) subcommands.ExitStatus {
 	x := NewXBus()
 	db := x.NewDB()
-	app_ctrl := x.NewAppCtrl(db, x.NewEtcdClient())
+	appCtrl := x.NewAppCtrl(db, x.NewEtcdClient())
 
-	app_list, err := apps.GetAppList(db)
+	appList, err := apps.GetAppList(db)
 	if err != nil {
 		glog.Errorf("get apps fail: %v", err)
 		return subcommands.ExitFailure
 	}
-	app_map := make(map[int64]apps.App)
-	for _, app := range app_list {
-		app_map[app.Id] = app
+	appMap := make(map[int64]apps.App)
+	for _, app := range appList {
+		appMap[app.ID] = app
 	}
-	group_list, err := apps.GetGroupList(db)
+	groupList, err := apps.GetGroupList(db)
 	if err != nil {
 		glog.Errorf("get groups fail: %v", err)
 		return subcommands.ExitFailure
 	}
-	group_map := make(map[int64]*apps.Group)
-	for _, group := range group_list {
-		group_map[group.Id] = &group
+	groupMap := make(map[int64]*apps.Group)
+	for _, group := range groupList {
+		groupMap[group.ID] = &group
 	}
 
 	var typ int
@@ -95,47 +101,47 @@ func (cmd *ListPerm) Execute(_ context.Context, f *flag.FlagSet, v ...interface{
 			canWrite = &cmd.canWrite
 		}
 	})
-	if perms, err := app_ctrl.GetPerms(typ, appName, groupName, canWrite, prefix); err == nil {
+	if perms, err := appCtrl.GetPerms(typ, appName, groupName, canWrite, prefix); err == nil {
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		fmt.Fprintf(w, "id\ttype\ttarget_type\ttarget\twrite\tcontent\tcreate_time\n")
 		for _, perm := range perms {
-			type_name := "unknown"
-			target_type_name := "unknown"
+			typeName := "unknown"
+			targetTypeName := "unknown"
 			target := ""
 			switch perm.PermType {
 			case apps.PermTypeConfig:
-				type_name = "config"
+				typeName = "config"
 			case apps.PermTypeService:
-				type_name = "service"
+				typeName = "service"
 			case apps.PermTypeApp:
-				type_name = "app"
+				typeName = "app"
 			}
 			switch perm.TargetType {
 			case apps.PermTargetApp:
-				target_type_name = "app"
-				if perm.TargetId == apps.PermPublicTargetId {
-					target_type_name = "<public>"
+				targetTypeName = "app"
+				if perm.TargetID == apps.PermPublicTargetID {
+					targetTypeName = "<public>"
 					target = "<public>"
 				} else {
-					target_type_name = "app"
-					if app, exists := app_map[perm.TargetId]; !exists {
-						target = fmt.Sprintf("<invalid: %d>", perm.TargetId)
+					targetTypeName = "app"
+					if app, exists := appMap[perm.TargetID]; !exists {
+						target = fmt.Sprintf("<invalid: %d>", perm.TargetID)
 					} else {
-						target = fmt.Sprintf("%s[%d]", app.Name, app.Id)
+						target = fmt.Sprintf("%s[%d]", app.Name, app.ID)
 					}
 				}
 			case apps.PermTargetGroup:
-				target_type_name = "group"
-				group := group_map[perm.TargetId]
+				targetTypeName = "group"
+				group := groupMap[perm.TargetID]
 				if group == nil {
-					target = fmt.Sprintf("<invalid: %d>", perm.TargetId)
+					target = fmt.Sprintf("<invalid: %d>", perm.TargetID)
 				} else {
-					target = fmt.Sprintf("%s[%d]", group.Name, group.Id)
+					target = fmt.Sprintf("%s[%d]", group.Name, group.ID)
 				}
 			}
 			fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
-				perm.Id, type_name, target_type_name, target,
-				perm.CanWrite, perm.Content, perm.CreateTime.Format(TIME_FMT))
+				perm.ID, typeName, targetTypeName, target,
+				perm.CanWrite, perm.Content, perm.CreateTime.Format(timeFmt))
 		}
 		w.Flush()
 	} else {

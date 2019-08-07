@@ -13,25 +13,31 @@ import (
 	"github.com/infrmods/xbus/services"
 )
 
-type RunCommand struct {
+// RunCmd run cmd
+type RunCmd struct {
 }
 
-func (cmd *RunCommand) Name() string {
+// Name cmd name
+func (cmd *RunCmd) Name() string {
 	return "run"
 }
 
-func (cmd *RunCommand) Synopsis() string {
+// Synopsis cmd synopsis
+func (cmd *RunCmd) Synopsis() string {
 	return "run server"
 }
 
-func (cmd *RunCommand) SetFlags(f *flag.FlagSet) {
+// SetFlags cmd set flags
+func (cmd *RunCmd) SetFlags(f *flag.FlagSet) {
 }
 
-func (cmd *RunCommand) Usage() string {
+// Usage cmd usgae
+func (cmd *RunCmd) Usage() string {
 	return ""
 }
 
-func (cmd *RunCommand) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+// Execute cmd execute
+func (cmd *RunCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	x := NewXBus()
 	db := x.NewDB()
 	etcdClient := x.NewEtcdClient()
@@ -41,7 +47,7 @@ func (cmd *RunCommand) Execute(_ context.Context, f *flag.FlagSet, _ ...interfac
 		os.Exit(-1)
 	}
 	configs := configs.NewConfigCtrl(&x.Config.Configs, db, etcdClient)
-	apiServer := api.NewAPIServer(&x.Config.Api, etcdClient, services, configs, x.NewAppCtrl(db, etcdClient))
+	apiServer := api.NewServer(&x.Config.API, etcdClient, services, configs, x.NewAppCtrl(db, etcdClient))
 	if err := apiServer.Run(); err != nil {
 		glog.Errorf("start api_sersver fail: %v", err)
 		os.Exit(-1)

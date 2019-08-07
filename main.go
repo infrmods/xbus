@@ -22,12 +22,13 @@ import (
 	_ "github.com/gocomm/dbutil/dialects/mysql"
 )
 
+// Config xbus config
 type Config struct {
 	Etcd     utils.ETCDConfig
 	Services services.Config
 	Configs  configs.Config
 	Apps     apps.Config
-	Api      api.Config
+	API      api.Config
 
 	DB struct {
 		Driver  string `default:"mysql"`
@@ -38,10 +39,12 @@ type Config struct {
 
 var cfgPath = flag.String("config", "config.yaml", "config file path")
 
+// XBus xbus
 type XBus struct {
 	Config Config
 }
 
+// NewXBus new xbus
 func NewXBus() *XBus {
 	var x XBus
 	if *cfgPath == "" {
@@ -57,6 +60,7 @@ func NewXBus() *XBus {
 	return &x
 }
 
+// NewDB new db
 func (x *XBus) NewDB() *sql.DB {
 	db, err := sql.Open(x.Config.DB.Driver, x.Config.DB.Source)
 	if err != nil {
@@ -67,6 +71,7 @@ func (x *XBus) NewDB() *sql.DB {
 	return db
 }
 
+// NewEtcdClient new etcd client
 func (x *XBus) NewEtcdClient() *clientv3.Client {
 	var tlsConfig *tls.Config
 	if x.Config.Etcd.CACert != "" {
@@ -92,6 +97,7 @@ func (x *XBus) NewEtcdClient() *clientv3.Client {
 	return etcdClient
 }
 
+// NewAppCtrl new app ctrl
 func (x *XBus) NewAppCtrl(db *sql.DB, etcdClient *clientv3.Client) *apps.AppCtrl {
 	appCtrl, err := apps.NewAppCtrl(&x.Config.Apps, db, etcdClient)
 	if err != nil {
@@ -106,11 +112,11 @@ func main() {
 	subcommands.Register(subcommands.FlagsCommand(), "")
 	subcommands.Register(subcommands.CommandsCommand(), "")
 	subcommands.Register(&NewAppCmd{}, "")
-	subcommands.Register(&RunCommand{}, "")
+	subcommands.Register(&RunCmd{}, "")
 	subcommands.Register(&GenRootCmd{}, "")
 	subcommands.Register(&ListAppCmd{}, "")
 	subcommands.Register(&ListGroupCmd{}, "")
-	subcommands.Register(&ListPerm{}, "")
+	subcommands.Register(&ListPermCmd{}, "")
 	subcommands.Register(&GrantCmd{}, "")
 	subcommands.Register(&KeyCertCmd{}, "")
 

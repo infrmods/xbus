@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+// GetErrCode get err code
 func GetErrCode(err error) codes.Code {
 	var code codes.Code = codes.Unknown
 	if etcdErr, ok := err.(rpctypes.EtcdError); ok {
@@ -19,6 +20,7 @@ func GetErrCode(err error) codes.Code {
 	return code
 }
 
+// CleanErrWithCode clean err with code
 func CleanErrWithCode(err error, sysErrRet, sysErrformat string, args ...interface{}) (codes.Code, error) {
 	code := GetErrCode(err)
 	if code != codes.Unknown {
@@ -43,6 +45,7 @@ func CleanErrWithCode(err error, sysErrRet, sysErrformat string, args ...interfa
 	return code, NewError(EcodeSystemError, sysErrRet)
 }
 
+// CleanErr clean err
 func CleanErr(err error, sysErrRet, sysErrformat string, args ...interface{}) error {
 	_, newErr := CleanErrWithCode(err, sysErrRet, sysErrformat, args...)
 	return newErr

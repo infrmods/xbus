@@ -22,8 +22,10 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
+// IPNet ipnet
 type IPNet net.IPNet
 
+// Config api server config
 type Config struct {
 	Listen      string        `default:"127.0.0.1:4433"`
 	CertFile    string        `default:"apicert.pem"`
@@ -34,6 +36,7 @@ type Config struct {
 	DevNets                  []IPNet
 }
 
+// UnmarshalYAML unmarshal yaml
 func (ipnet *IPNet) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var str string
 	if err := unmarshal(&str); err != nil {
@@ -43,16 +46,17 @@ func (ipnet *IPNet) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return fmt.Errorf("empty ipnet")
 	}
 
-	if _, result, err := net.ParseCIDR(str); err == nil {
-		ipnet.IP = result.IP
-		ipnet.Mask = result.Mask
-		return nil
-	} else {
+	_, result, err := net.ParseCIDR(str)
+	if err != nil {
 		return err
 	}
+	ipnet.IP = result.IP
+	ipnet.Mask = result.Mask
+	return nil
 }
 
-type APIServer struct {
+// Server api server
+type Server struct {
 	config Config
 	tls    bool
 
@@ -64,16 +68,17 @@ type APIServer struct {
 	e *echo.Echo
 }
 
-func NewAPIServer(config *Config, etcdClient *clientv3.Client,
-	servs *services.ServiceCtrl, cfgs *configs.ConfigCtrl, apps *apps.AppCtrl) *APIServer {
-	server := &APIServer{config: *config, tls: config.CertFile != "",
+// NewServer new api server
+func NewServer(config *Config, etcdClient *clientv3.Client,
+	servs *services.ServiceCtrl, cfgs *configs.ConfigCtrl, apps *apps.AppCtrl) *Server {
+	server := &Server{config: *config, tls: config.CertFile != "",
 		etcdClient: etcdClient,
 		services:   servs, configs: cfgs, apps: apps, e: echo.New()}
 	server.prepare()
 	return server
 }
 
-func (server *APIServer) prepare() {
+func (server *Server) prepare() {
 	server.e.Use(middleware.Recover())
 	if glog.V(1) {
 		server.e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
@@ -88,7 +93,8 @@ func (server *APIServer) prepare() {
 	server.registerLeaseAPIs(server.e.Group("/api/leases"))
 }
 
-func (server *APIServer) Run() error {
+// Run run server
+func (server *Server) Run() error {
 	useTLS := server.config.CertFile != ""
 	addr := server.config.Listen
 	if !strings.Contains(addr, ":") {
@@ -114,7 +120,7 @@ func (server *APIServer) Run() error {
 	return server.e.Shutdown(ctx)
 }
 
-func (server *APIServer) start() (err error) {
+func (server *Server) start() (err error) {
 	useTLS := server.config.CertFile != ""
 	var s *http.Server
 	if useTLS {
@@ -144,14 +150,14 @@ func (server *APIServer) start() (err error) {
 	return server.e.StartServer(s)
 }
 
-func (server *APIServer) getRemoteIP(c echo.Context) net.IP {
+func (server *Server) getRemoteIP(c echo.Context) net.IP {
 	if host, _, err := net.SplitHostPort(c.Request().RemoteAddr); err == nil {
 		return net.ParseIP(host)
 	}
 	return nil
 }
 
-func (server *APIServer) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
+func (server *Server) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 	return echo.HandlerFunc(func(c echo.Context) error {
 		var appName string
 		req := c.Request()
@@ -182,7 +188,7 @@ func (server *APIServer) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 		if appName != "" {
 			if app, groupIds, err := server.apps.GetAppGroupByName(appName); err != nil {
 				glog.Errorf("get app(%s) fail: %v", appName, err)
-				return JsonErrorC(c, http.StatusServiceUnavailable,
+				return JSONErrorC(c, http.StatusServiceUnavailable,
 					utils.Errorf(utils.EcodeSystemError, "get app fail"))
 			} else if app == nil {
 				glog.V(1).Infof("no such app: %s", appName)
@@ -195,36 +201,36 @@ func (server *APIServer) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 	})
 }
 
-func (server *APIServer) appId(c echo.Context) int64 {
+func (server *Server) appID(c echo.Context) int64 {
 	if x := c.Get("app").(*apps.App); x != nil {
-		return x.Id
+		return x.ID
 	}
 	return 0
 }
 
-func (server *APIServer) appName(c echo.Context) string {
+func (server *Server) appName(c echo.Context) string {
 	if x := c.Get("app").(*apps.App); x != nil {
 		return x.Name
 	}
 	return "null"
 }
 
-func (server *APIServer) app(c echo.Context) *apps.App {
+func (server *Server) app(c echo.Context) *apps.App {
 	return c.Get("app").(*apps.App)
 }
 
-func (server *APIServer) newNotPermittedResp(c echo.Context, keys ...string) error {
+func (server *Server) newNotPermittedResp(c echo.Context, keys ...string) error {
 	msg := fmt.Sprintf("not permitted: [%s] %s", server.appName(c), strings.Join(keys, ", "))
-	return JsonError(c, utils.NewNotPermittedError(msg, keys))
+	return JSONError(c, utils.NewNotPermittedError(msg, keys))
 }
 
-func (server *APIServer) checkPerm(c echo.Context, permType int, needWrite bool, name string) (bool, error) {
+func (server *Server) checkPerm(c echo.Context, permType int, needWrite bool, name string) (bool, error) {
 	app := c.Get("app").(*apps.App)
 	if app == nil {
 		if needWrite {
 			return false, nil
 		}
-		if has, err := server.apps.HasAnyPrefixPerm(permType, apps.PermPublicTargetId, nil, needWrite, name); err == nil {
+		if has, err := server.apps.HasAnyPrefixPerm(permType, apps.PermPublicTargetID, nil, needWrite, name); err == nil {
 			if !has {
 				return false, nil
 			}
@@ -233,7 +239,7 @@ func (server *APIServer) checkPerm(c echo.Context, permType int, needWrite bool,
 		}
 	} else if !strings.HasPrefix(name, app.Name+".") {
 		groupIds := c.Get("groupIds").([]int64)
-		if has, err := server.apps.HasAnyPrefixPerm(permType, app.Id, groupIds, needWrite, name); err == nil {
+		if has, err := server.apps.HasAnyPrefixPerm(permType, app.ID, groupIds, needWrite, name); err == nil {
 			if !has {
 				return false, nil
 			}
@@ -245,7 +251,7 @@ func (server *APIServer) checkPerm(c echo.Context, permType int, needWrite bool,
 	return true, nil
 }
 
-func (server *APIServer) newPermChecker(permType int, needWrite bool) echo.MiddlewareFunc {
+func (server *Server) newPermChecker(permType int, needWrite bool) echo.MiddlewareFunc {
 	return echo.MiddlewareFunc(func(h echo.HandlerFunc) echo.HandlerFunc {
 		return echo.HandlerFunc(func(c echo.Context) error {
 			if ok, err := server.checkPerm(c, permType, needWrite, c.ParamValues()[0]); err == nil {
@@ -253,14 +259,14 @@ func (server *APIServer) newPermChecker(permType int, needWrite bool) echo.Middl
 					return server.newNotPermittedResp(c, c.ParamValues()[0])
 				}
 			} else {
-				return JsonError(c, err)
+				return JSONError(c, err)
 			}
 			return h(c)
 		})
 	})
 }
 
-func (server *APIServer) registerV0ServiceAPIs(g *echo.Group) {
+func (server *Server) registerV0ServiceAPIs(g *echo.Group) {
 	g.POST("/:name/:version", echo.HandlerFunc(server.v0PlugService),
 		server.newPermChecker(apps.PermTypeService, true))
 	g.DELETE("/:name/:version/:id", echo.HandlerFunc(server.v0UnplugService),
@@ -278,7 +284,7 @@ func (server *APIServer) registerV0ServiceAPIs(g *echo.Group) {
 	}
 }
 
-func (server *APIServer) registerV1ServiceAPIs(g *echo.Group) {
+func (server *Server) registerV1ServiceAPIs(g *echo.Group) {
 	g.POST("/:service", echo.HandlerFunc(server.v1PlugService),
 		server.newPermChecker(apps.PermTypeService, true))
 	g.DELETE("/:service", echo.HandlerFunc(server.v1DeleteService),
@@ -296,25 +302,25 @@ func (server *APIServer) registerV1ServiceAPIs(g *echo.Group) {
 	}
 }
 
-func (server *APIServer) registerLeaseAPIs(g *echo.Group) {
-	g.POST("", echo.HandlerFunc(server.GrantLease))
-	g.POST("/:id", echo.HandlerFunc(server.KeepAliveLease))
-	g.DELETE("/:id", echo.HandlerFunc(server.RevokeLease))
+func (server *Server) registerLeaseAPIs(g *echo.Group) {
+	g.POST("", echo.HandlerFunc(server.grantLease))
+	g.POST("/:id", echo.HandlerFunc(server.keepAliveLease))
+	g.DELETE("/:id", echo.HandlerFunc(server.revokeLease))
 }
 
-func (server *APIServer) registerConfigAPIs(g *echo.Group) {
-	g.GET("/:name", echo.HandlerFunc(server.GetConfig),
+func (server *Server) registerConfigAPIs(g *echo.Group) {
+	g.GET("/:name", echo.HandlerFunc(server.getConfig),
 		server.newPermChecker(apps.PermTypeConfig, false))
-	g.GET("", echo.HandlerFunc(server.ListConfig))
-	g.PUT("/:name", echo.HandlerFunc(server.PutConfig),
+	g.GET("", echo.HandlerFunc(server.listConfig))
+	g.PUT("/:name", echo.HandlerFunc(server.putConfig),
 		server.newPermChecker(apps.PermTypeConfig, true))
-	g.DELETE("/:name", echo.HandlerFunc(server.DeleteConfig),
+	g.DELETE("/:name", echo.HandlerFunc(server.deleteConfig),
 		server.newPermChecker(apps.PermTypeConfig, true))
 }
 
-func (server *APIServer) registerAppAPIs(g *echo.Group) {
-	g.GET("/:name/cert", echo.HandlerFunc(server.GetAppCert))
+func (server *Server) registerAppAPIs(g *echo.Group) {
+	g.GET("/:name/cert", echo.HandlerFunc(server.getAppCert))
 	g.GET("/:name/nodes", echo.HandlerFunc(server.watchAppNodes))
-	g.GET("", echo.HandlerFunc(server.ListApp))
-	g.PUT("", echo.HandlerFunc(server.NewApp))
+	g.GET("", echo.HandlerFunc(server.listApp))
+	g.PUT("", echo.HandlerFunc(server.newApp))
 }

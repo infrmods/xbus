@@ -7,22 +7,26 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/golang/glog"
-	"github.com/infrmods/xbus/utils"
 	"math/big"
 	"net"
 	"time"
+
+	"github.com/golang/glog"
+	"github.com/infrmods/xbus/utils"
 )
 
+// SerialGenerator serial generator
 type SerialGenerator interface {
 	Generate() (*big.Int, error)
 }
 
+// CertsConfig certs config
 type CertsConfig struct {
 	RootCert string `default:"rootcert.pem"`
 	RootKey  string `default:"rootkey.pem"`
 }
 
+// CertsCtrl certs ctrl
 type CertsCtrl struct {
 	rootCert        *x509.Certificate
 	rootKey         crypto.Signer
@@ -30,6 +34,7 @@ type CertsCtrl struct {
 	serialGenerator SerialGenerator
 }
 
+// NewCertsCtrl new certs ctrl
 func NewCertsCtrl(config *CertsConfig, serialGenerator SerialGenerator) (*CertsCtrl, error) {
 	certBlock, err := utils.ReadPEM(config.RootCert)
 	if err != nil {
@@ -74,12 +79,14 @@ func NewCertsCtrl(config *CertsConfig, serialGenerator SerialGenerator) (*CertsC
 	return mgr, nil
 }
 
+// CertPool cert poll
 func (mgr *CertsCtrl) CertPool() *x509.CertPool {
 	pool := x509.NewCertPool()
 	pool.AddCert(mgr.rootCert)
 	return pool
 }
 
+// NewCert new cert
 func (mgr *CertsCtrl) NewCert(pubkey crypto.PublicKey, subject pkix.Name,
 	dnsNames []string, ips []net.IP, days int) ([]byte, error) {
 	serialNumber, err := mgr.serialGenerator.Generate()
@@ -100,11 +107,11 @@ func (mgr *CertsCtrl) NewCert(pubkey crypto.PublicKey, subject pkix.Name,
 			x509.ExtKeyUsageServerAuth},
 	}
 
-	if data, err := x509.CreateCertificate(rand.Reader, &template, mgr.rootCert,
-		pubkey, mgr.rootKey); err == nil {
-		return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: data}), nil
-	} else {
+	data, err := x509.CreateCertificate(rand.Reader, &template, mgr.rootCert,
+		pubkey, mgr.rootKey)
+	if err != nil {
 		glog.Errorf("create cert fail: %v", err)
 		return nil, utils.NewSystemError("create cert fail")
 	}
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: data}), nil
 }

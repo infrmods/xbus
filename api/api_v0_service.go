@@ -48,18 +48,18 @@ func (desc *_ServiceDescV0) toV1() services.ServiceDescV1 {
 	}
 }
 
-type ServiceV0 struct {
+type serviceV0 struct {
 	Endpoints []services.ServiceEndpoint `json:"endpoints"`
 
 	_ServiceDescV0
 }
 
-func newServiceV0(service *services.ServiceV1) *ServiceV0 {
+func newServiceV0(service *services.ServiceV1) *serviceV0 {
 	serviceZone := service.Zones[services.DefaultZone]
 	if serviceZone == nil {
 		return nil
 	}
-	return &ServiceV0{
+	return &serviceV0{
 		Endpoints:      serviceZone.Endpoints,
 		_ServiceDescV0: newServiceDescV0(&serviceZone.ServiceDescV1),
 	}
@@ -70,13 +70,13 @@ type _ServicePlugResult struct {
 	TTL     int64            `json:"ttl"`
 }
 
-func (server *APIServer) v0PlugService(c echo.Context) error {
+func (server *Server) v0PlugService(c echo.Context) error {
 	ttl, ok, err := IntFormParamD(c, "ttl", 60)
 	if !ok {
 		return err
 	}
 	if ttl > 0 && ttl < _MinServiceTTL {
-		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
+		return JSONErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
 	}
 	leaseID, ok, err := IntFormParamD(c, "lease_id", 0)
 	if !ok {
@@ -84,32 +84,32 @@ func (server *APIServer) v0PlugService(c echo.Context) error {
 	}
 
 	var desc _ServiceDescV0
-	if ok, err := JsonFormParam(c, "desc", &desc); !ok {
+	if ok, err := JSONFormParam(c, "desc", &desc); !ok {
 		return err
 	}
 	desc.Name, desc.Version = c.ParamValues()[0], c.ParamValues()[1]
 	var endpoint services.ServiceEndpoint
-	if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
+	if ok, err := JSONFormParam(c, "endpoint", &endpoint); !ok {
 		return err
 	}
 
 	descV1 := desc.toV1()
-	if leaseID, err := server.services.Plug(context.Background(),
+	newLeaseID, err := server.services.Plug(context.Background(),
 		time.Duration(ttl)*time.Second, clientv3.LeaseID(leaseID),
-		&descV1, &endpoint); err == nil {
-		return JsonResult(c, _ServicePlugResult{LeaseID: leaseID, TTL: ttl})
-	} else {
-		return JsonError(c, err)
+		&descV1, &endpoint)
+	if err != nil {
+		return JSONError(c, err)
 	}
+	return JSONResult(c, _ServicePlugResult{LeaseID: newLeaseID, TTL: ttl})
 }
 
-func (server *APIServer) v0PlugAllService(c echo.Context) error {
+func (server *Server) v0PlugAllService(c echo.Context) error {
 	ttl, ok, err := IntFormParamD(c, "ttl", 60)
 	if !ok {
 		return err
 	}
 	if ttl > 0 && ttl < _MinServiceTTL {
-		return JsonErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
+		return JSONErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
 	}
 	leaseID, ok, err := IntFormParamD(c, "lease_id", 0)
 	if !ok {
@@ -117,7 +117,7 @@ func (server *APIServer) v0PlugAllService(c echo.Context) error {
 	}
 
 	var desces []_ServiceDescV0
-	if ok, err := JsonFormParam(c, "desces", &desces); !ok {
+	if ok, err := JSONFormParam(c, "desces", &desces); !ok {
 		return err
 	}
 	notPermitted := make([]string, 0)
@@ -127,7 +127,7 @@ func (server *APIServer) v0PlugAllService(c echo.Context) error {
 				notPermitted = append(notPermitted, desc.Name)
 			}
 		} else {
-			return JsonError(c, err)
+			return JSONError(c, err)
 		}
 	}
 	if len(notPermitted) > 0 {
@@ -135,7 +135,7 @@ func (server *APIServer) v0PlugAllService(c echo.Context) error {
 	}
 
 	var endpoint services.ServiceEndpoint
-	if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
+	if ok, err := JSONFormParam(c, "endpoint", &endpoint); !ok {
 		return err
 	}
 
@@ -143,40 +143,40 @@ func (server *APIServer) v0PlugAllService(c echo.Context) error {
 	for _, desc := range desces {
 		descesV1 = append(descesV1, desc.toV1())
 	}
-	if leaseID, err := server.services.PlugAllService(context.Background(),
+	newLeaseID, err := server.services.PlugAllService(context.Background(),
 		time.Duration(ttl)*time.Second, clientv3.LeaseID(leaseID),
-		descesV1, &endpoint); err == nil {
-		return JsonResult(c, _ServicePlugResult{LeaseID: leaseID, TTL: ttl})
-	} else {
-		return JsonError(c, err)
+		descesV1, &endpoint)
+	if err != nil {
+		return JSONError(c, err)
 	}
+	return JSONResult(c, _ServicePlugResult{LeaseID: newLeaseID, TTL: ttl})
 }
 
-func (server *APIServer) v0UnplugService(c echo.Context) error {
+func (server *Server) v0UnplugService(c echo.Context) error {
 	service := fmt.Sprintf("%s:%s", c.ParamValues()[0], c.ParamValues()[1])
-	if err := server.services.Unplug(context.Background(), service, services.DefaultZone, c.ParamValues()[2]); err == nil {
-		return JsonOk(c)
-	} else {
-		return JsonError(c, err)
+	err := server.services.Unplug(context.Background(), service, services.DefaultZone, c.ParamValues()[2])
+	if err != nil {
+		return JSONError(c, err)
 	}
+	return JSONOk(c)
 }
 
-func (server *APIServer) v0UpdateService(c echo.Context) error {
+func (server *Server) v0UpdateService(c echo.Context) error {
 	var endpoint services.ServiceEndpoint
-	if ok, err := JsonFormParam(c, "endpoint", &endpoint); !ok {
+	if ok, err := JSONFormParam(c, "endpoint", &endpoint); !ok {
 		return err
 	}
 	params := c.ParamValues()
 	if endpoint.Address == "" {
 		endpoint.Address = params[2]
 	} else if endpoint.Address != params[2] {
-		return JsonErrorf(c, utils.EcodeInvalidParam, "can't modify address")
+		return JSONErrorf(c, utils.EcodeInvalidParam, "can't modify address")
 	}
 	service := fmt.Sprintf("%s:%s", params[0], params[1])
 	if err := server.services.Update(context.Background(), service, services.DefaultZone, params[2], &endpoint); err != nil {
-		return JsonError(c, err)
+		return JSONError(c, err)
 	}
-	return JsonOk(c)
+	return JSONOk(c)
 }
 
 type _ServiceItemV0 struct {
@@ -190,7 +190,7 @@ type _SearchResultV0 struct {
 	Total    int64            `json:"total"`
 }
 
-func (server *APIServer) v0SearchService(c echo.Context) error {
+func (server *Server) v0SearchService(c echo.Context) error {
 	skip, ok, err := IntQueryParamD(c, "skip", 0)
 	if !ok {
 		return err
@@ -199,43 +199,43 @@ func (server *APIServer) v0SearchService(c echo.Context) error {
 	if !ok {
 		return err
 	}
-	if result, err := server.services.SearchService(c.QueryParam("q"), skip, limit); err == nil {
-		v0Services := make([]_ServiceItemV0, 0, len(result.Services))
-		for _, item := range result.Services {
-			parts := strings.Split(item.Service, ":")
-			v0Services = append(v0Services, _ServiceItemV0{
-				Name: parts[0], Version: parts[1], Type: item.Type,
-			})
-		}
-		return JsonResult(c, _SearchResultV0{Services: v0Services, Total: result.Total})
-	} else {
-		return JsonError(c, err)
+	result, err := server.services.SearchService(c.QueryParam("q"), skip, limit)
+	if err != nil {
+		return JSONError(c, err)
 	}
+	v0Services := make([]_ServiceItemV0, 0, len(result.Services))
+	for _, item := range result.Services {
+		parts := strings.Split(item.Service, ":")
+		v0Services = append(v0Services, _ServiceItemV0{
+			Name: parts[0], Version: parts[1], Type: item.Type,
+		})
+	}
+	return JSONResult(c, _SearchResultV0{Services: v0Services, Total: result.Total})
 }
 
-type _ServiceQueryResultV0 struct {
-	Service  *ServiceV0 `json:"service"`
+type serviceQueryResultV0 struct {
+	Service  *serviceV0 `json:"service"`
 	Revision int64      `json:"revision"`
 }
 
-func (server *APIServer) v0QueryService(c echo.Context) error {
+func (server *Server) v0QueryService(c echo.Context) error {
 	if c.QueryParam("watch") == "true" {
 		return server.v0WatchService(c)
 	}
 	params := c.ParamValues()
 	serviceKey := fmt.Sprintf("%s:%s", params[0], params[1])
-	if service, rev, err := server.services.Query(context.Background(), server.getRemoteIP(c), serviceKey); err == nil {
-		serviceV0 := newServiceV0(service)
-		if serviceV0 == nil {
-			return JsonError(c, utils.Errorf(utils.EcodeNotFound, "no such service: %s", serviceKey))
-		}
-		return JsonResult(c, _ServiceQueryResultV0{Service: serviceV0, Revision: rev})
-	} else {
-		return JsonError(c, err)
+	service, rev, err := server.services.Query(context.Background(), server.getRemoteIP(c), serviceKey)
+	if err != nil {
+		return JSONError(c, err)
 	}
+	serviceV0 := newServiceV0(service)
+	if serviceV0 == nil {
+		return JSONError(c, utils.Errorf(utils.EcodeNotFound, "no such service: %s", serviceKey))
+	}
+	return JSONResult(c, serviceQueryResultV0{Service: serviceV0, Revision: rev})
 }
 
-func (server *APIServer) v0WatchService(c echo.Context) error {
+func (server *Server) v0WatchService(c echo.Context) error {
 	revision, ok, err := IntQueryParamD(c, "revision", 0)
 	if !ok {
 		return err
@@ -249,13 +249,13 @@ func (server *APIServer) v0WatchService(c echo.Context) error {
 
 	params := c.ParamValues()
 	serviceKey := fmt.Sprintf("%s:%s", params[0], params[1])
-	if service, rev, err := server.services.Watch(ctx, server.getRemoteIP(c), serviceKey, revision); err == nil {
-		serviceV0 := newServiceV0(service)
-		if serviceV0 == nil {
-			return JsonError(c, utils.Errorf(utils.EcodeNotFound, "no such service: %s", serviceKey))
-		}
-		return JsonResult(c, _ServiceQueryResultV0{Service: serviceV0, Revision: rev})
-	} else {
-		return JsonError(c, err)
+	service, rev, err := server.services.Watch(ctx, server.getRemoteIP(c), serviceKey, revision)
+	if err != nil {
+		return JSONError(c, err)
 	}
+	serviceV0 := newServiceV0(service)
+	if serviceV0 == nil {
+		return JSONError(c, utils.Errorf(utils.EcodeNotFound, "no such service: %s", serviceKey))
+	}
+	return JSONResult(c, serviceQueryResultV0{Service: serviceV0, Revision: rev})
 }

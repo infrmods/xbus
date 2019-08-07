@@ -11,8 +11,9 @@ import (
 	"github.com/gocomm/dbutil"
 )
 
+// App app table
 type App struct {
-	Id          int64     `json:"-"`
+	ID          int64     `json:"-"`
 	Status      int       `json:"status"`
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
@@ -24,6 +25,7 @@ type App struct {
 	certificate *x509.Certificate
 }
 
+// Certificate cert
 func (app *App) Certificate() (*x509.Certificate, error) {
 	if app.certificate == nil {
 		block, _ := pem.Decode([]byte(app.Cert))
@@ -39,31 +41,35 @@ func (app *App) Certificate() (*x509.Certificate, error) {
 	return app.certificate, nil
 }
 
+// ListApp list app
 func ListApp(db *sql.DB, skip, limit int) ([]App, error) {
 	var apps []App
-	if err := dbutil.Query(db, &apps, `select * from apps order by id limit ?,?`, skip, limit); err == nil {
-		return apps, nil
-	} else {
+	err := dbutil.Query(db, &apps, `select * from apps order by id limit ?,?`, skip, limit)
+	if err != nil {
 		return nil, err
 	}
+	return apps, nil
 }
 
+// InsertApp insert app
 func InsertApp(db *sql.DB, app *App) error {
-	if id, err := dbutil.Insert(db,
+	id, err := dbutil.Insert(db,
 		`insert ignore into apps(status, name, description, private_key, cert)
-         values(?, ?, ?, ?, ?)`, app.Status, app.Name, app.Description, app.PrivateKey, app.Cert); err == nil {
-		app.Id = id
-		return nil
-	} else {
+         values(?, ?, ?, ?, ?)`, app.Status, app.Name, app.Description, app.PrivateKey, app.Cert)
+	if err != nil {
 		return err
 	}
+	app.ID = id
+	return nil
 }
 
+// GetAppList get app list
 func GetAppList(db *sql.DB) (apps []App, err error) {
 	err = dbutil.Query(db, &apps, `select * from apps`)
 	return
 }
 
+// GetAppByName get app by name
 func GetAppByName(db *sql.DB, name string) (*App, error) {
 	var app App
 	if err := dbutil.Query(db, &app,
@@ -76,6 +82,7 @@ func GetAppByName(db *sql.DB, name string) (*App, error) {
 	}
 }
 
+// GetAppGroupByName get app group by name
 func GetAppGroupByName(db *sql.DB, name string) (*App, []int64, error) {
 	row := db.QueryRow(`select apps.id, apps.status, apps.name,
                                apps.description, apps.cert, apps.create_time, apps.modify_time,
@@ -86,10 +93,10 @@ func GetAppGroupByName(db *sql.DB, name string) (*App, []int64, error) {
 						where apps.name=?
                         group by apps.id,groups.id`, name)
 	var app App
-	var groupIds dbutil.NumList
-	if err := row.Scan(&app.Id, &app.Status, &app.Name, &app.Description,
-		&app.Cert, &app.CreateTime, &app.ModifyTime, &groupIds); err == nil {
-		return &app, groupIds, nil
+	var groupIDs dbutil.NumList
+	if err := row.Scan(&app.ID, &app.Status, &app.Name, &app.Description,
+		&app.Cert, &app.CreateTime, &app.ModifyTime, &groupIDs); err == nil {
+		return &app, groupIDs, nil
 	} else if err == sql.ErrNoRows {
 		return nil, nil, nil
 	} else {
@@ -97,8 +104,9 @@ func GetAppGroupByName(db *sql.DB, name string) (*App, []int64, error) {
 	}
 }
 
+// Group group table
 type Group struct {
-	Id          int64     `json:"-"`
+	ID          int64     `json:"-"`
 	Status      int       `json:"status"`
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
@@ -106,22 +114,25 @@ type Group struct {
 	ModifyTime  time.Time `json:"modify_time"`
 }
 
+// InsertGroup insert group
 func InsertGroup(db *sql.DB, group *Group) error {
-	if id, err := dbutil.Insert(db,
+	id, err := dbutil.Insert(db,
 		`insert into groups(status, name, description)
-         values(?, ?, ?)`, group.Status, group.Name, group.Description); err == nil {
-		group.Id = id
-		return nil
-	} else {
+         values(?, ?, ?)`, group.Status, group.Name, group.Description)
+	if err != nil {
 		return err
 	}
+	group.ID = id
+	return nil
 }
 
+// GetGroupList get group list
 func GetGroupList(db *sql.DB) (groups []Group, err error) {
 	err = dbutil.Query(db, &groups, `select * from groups`)
 	return
 }
 
+// GetGroupByName get group by name
 func GetGroupByName(db *sql.DB, name string) (*Group, error) {
 	var group Group
 	if err := dbutil.Query(db, &group,
@@ -134,69 +145,80 @@ func GetGroupByName(db *sql.DB, name string) (*Group, error) {
 	}
 }
 
+// GroupMember group member
 type GroupMember struct {
-	Id         int64
-	AppId      int64
-	GroupId    int64
+	ID         int64
+	AppID      int64
+	GroupID    int64
 	CreateTime time.Time
 }
 
-func NewGroupMember(db *sql.DB, groupId, appId int64) error {
+// NewGroupMember new group member
+func NewGroupMember(db *sql.DB, groupID, appID int64) error {
 	_, err := dbutil.Insert(db,
 		`insert into group_members(app_id, group_id)
-         values(?, ?)`, appId, groupId)
+         values(?, ?)`, appID, groupID)
 	return err
 }
 
-func GetGroupMembers(db *sql.DB, groupId int64) (apps []App, err error) {
+// GetGroupMembers get group members
+func GetGroupMembers(db *sql.DB, groupID int64) (apps []App, err error) {
 	if err := dbutil.Query(db, &apps,
 		`select * from apps
          where apps.id in
              (select app_id from group_members
-              where group_id=?)`, groupId); err != nil {
+              where group_id=?)`, groupID); err != nil {
 		return nil, err
 	}
 	return
 }
 
 const (
-	PermTypeConfig  = 0
+	// PermTypeConfig perm type config
+	PermTypeConfig = 0
+	// PermTypeService perm type service
 	PermTypeService = 1
-	PermTypeApp     = 2
+	// PermTypeApp perm type app
+	PermTypeApp = 2
 
-	PermTargetApp   = 0
+	// PermTargetApp perm target app
+	PermTargetApp = 0
+	// PermTargetGroup perm target group
 	PermTargetGroup = 1
 
-	PermPublicTargetId = 0
+	// PermPublicTargetID perm public target id
+	PermPublicTargetID = 0
 )
 
+// Perm perm table
 type Perm struct {
-	Id         int64
+	ID         int64
 	PermType   int
 	TargetType int
-	TargetId   int64
+	TargetID   int64
 	CanWrite   bool
 	Content    string
 	CreateTime time.Time
 }
 
-func GetPerms(db *sql.DB, typ int, target_type *int, target_id *int64,
-	can_write *bool, prefix *string) ([]Perm, error) {
+// GetPerms get perms
+func GetPerms(db *sql.DB, typ int, targetType *int, targetID *int64,
+	canWrite *bool, prefix *string) ([]Perm, error) {
 	args := make([]interface{}, 0, 5)
 	args = append(args, typ)
 
 	q := `select * from perms where perm_type=?`
-	if target_type != nil {
-		q += ` and target_type=?`
-		args = append(args, *target_type)
+	if targetType != nil {
+		q += ` and targetType=?`
+		args = append(args, *targetType)
 	}
-	if target_id != nil {
-		q += ` and target_id=?`
-		args = append(args, *target_id)
+	if targetID != nil {
+		q += ` and targetID=?`
+		args = append(args, *targetID)
 	}
-	if can_write != nil {
-		q += ` and can_write=?`
-		args = append(args, *can_write)
+	if canWrite != nil {
+		q += ` and canWrite=?`
+		args = append(args, *canWrite)
 	}
 	if prefix != nil {
 		q += ` and content like ?`
@@ -204,26 +226,27 @@ func GetPerms(db *sql.DB, typ int, target_type *int, target_id *int64,
 	}
 
 	var perms []Perm
-	if err := dbutil.Query(db, &perms, q, args...); err == nil {
-		return perms, nil
-	} else {
+	err := dbutil.Query(db, &perms, q, args...)
+	if err != nil {
 		return nil, err
 	}
+	return perms, nil
 }
 
+// InsertPerm insert perm
 func InsertPerm(db *sql.DB, perm *Perm) error {
 	var query string
 	if perm.CanWrite {
-		query = `insert into perms(perm_type, target_type, target_id, can_write, content)
+		query = `insert into perms(perm_type, targetType, targetID, canWrite, content)
                  values(?, ?, ?, ?, ?)
-                 on duplicate key update can_write=true`
+                 on duplicate key update canWrite=true`
 	} else {
-		query = `insert ignore into perms(perm_type, target_type, target_id, can_write, content)
+		query = `insert ignore into perms(perm_type, targetType, targetID, canWrite, content)
                  values(?, ?, ?, ?, ?)`
 	}
-	if id, err := dbutil.Insert(db, query, perm.PermType, perm.TargetType, perm.TargetId,
+	if id, err := dbutil.Insert(db, query, perm.PermType, perm.TargetType, perm.TargetID,
 		perm.CanWrite, perm.Content); err == nil {
-		perm.Id = id
+		perm.ID = id
 		return nil
 	} else if err == dbutil.ZeroEffected {
 		return nil
@@ -232,41 +255,42 @@ func InsertPerm(db *sql.DB, perm *Perm) error {
 	}
 }
 
-func HasAnyPrefixPerm(db *sql.DB, permType int, appId int64, groupIds []int64, needWrite bool, content string) (bool, error) {
+// HasAnyPrefixPerm has any prefix perm
+func HasAnyPrefixPerm(db *sql.DB, permType int, appID int64, groupIDs []int64, needWrite bool, content string) (bool, error) {
 	var extra string
 	if needWrite {
-		extra = ` and can_write=true`
+		extra = ` and canWrite=true`
 	}
 	var count int64
 	var err error
-	if appId == PermPublicTargetId {
+	if appID == PermPublicTargetID {
 		err = dbutil.Query(db, &count,
 			`select count(*) from perms
-             where target_type=? and target_id=? and
+             where targetType=? and targetID=? and
                    perm_type=? and ? like CONCAT(content, "%")`+extra,
-			PermTargetApp, PermPublicTargetId,
+			PermTargetApp, PermPublicTargetID,
 			permType, content)
 	} else {
 		err = dbutil.Query(db, &count,
 			`select count(*) from perms
-             where ((target_type=? and target_id in (?)) or
-                    (target_type=? and target_id=?) or
-                    target_id=?) and
+             where ((targetType=? and targetID in (?)) or
+                    (targetType=? and targetID=?) or
+                    targetID=?) and
                    perm_type=? and ? like CONCAT(content, "%")`+extra,
-			PermTargetGroup, dbutil.NumList(groupIds),
-			PermTargetApp, appId,
-			PermPublicTargetId,
+			PermTargetGroup, dbutil.NumList(groupIDs),
+			PermTargetApp, appID,
+			PermPublicTargetID,
 			permType, content)
 	}
-	if err == nil {
-		return count > 0, nil
-	} else {
+	if err != nil {
 		return false, err
 	}
+	return count > 0, nil
 }
 
+// ConfigItem config item table
 type ConfigItem struct {
-	Id         int64
+	ID         int64
 	Name       string
 	Value      string
 	Ver        int64
@@ -274,19 +298,22 @@ type ConfigItem struct {
 	ModifyTime time.Time
 }
 
+// GetIntValue get int value
 func (m *ConfigItem) GetIntValue() (int64, error) {
 	return strconv.ParseInt(m.Value, 10, 64)
 }
 
+// SetIntValue set int value
 func (m *ConfigItem) SetIntValue(n int64) {
 	m.Value = strconv.FormatInt(n, 10)
 }
 
+// InsertConfigItem insert config item
 func InsertConfigItem(db *sql.DB, item *ConfigItem) (bool, error) {
 	if id, err := dbutil.Insert(db,
 		`insert ignore into config_items(name, value, ver)
          values(?,?,?)`, item.Name, item.Value, item.Ver); err == nil {
-		item.Id = id
+		item.ID = id
 		return true, nil
 	} else if err == dbutil.ZeroEffected {
 		return false, nil
@@ -295,27 +322,30 @@ func InsertConfigItem(db *sql.DB, item *ConfigItem) (bool, error) {
 	}
 }
 
+// GetConfigItem get config item
 func GetConfigItem(db *sql.DB, name string) (*ConfigItem, error) {
 	var item ConfigItem
-	if err := dbutil.Query(db, &item,
+	err := dbutil.Query(db, &item,
 		`select id, name, value, ver, create_time, modify_time
-                        from config_items where name=?`, name); err == nil {
-		return &item, nil
-	} else {
+                        from config_items where name=?`, name)
+	if err != nil {
 		return nil, err
 	}
+	return &item, nil
 }
 
-func (item *ConfigItem) Refresh(db *sql.DB) error {
+// Refresh refresh
+func (m *ConfigItem) Refresh(db *sql.DB) error {
 	row := db.QueryRow(`select name, value, ver, create_time, modify_time
-                        from config_items where id=?`, item.Id)
-	return row.Scan(&item.Name, &item.Value,
-		&item.Ver, &item.CreateTime, &item.ModifyTime)
+                        from config_items where id=?`, m.ID)
+	return row.Scan(&m.Name, &m.Value,
+		&m.Ver, &m.CreateTime, &m.ModifyTime)
 }
 
-func (item *ConfigItem) UpdateValue(db *sql.DB) error {
+// UpdateValue update value
+func (m *ConfigItem) UpdateValue(db *sql.DB) error {
 	_, err := dbutil.Update(db, `update config_items set value=?, ver=ver+1
                                  where id=? and ver=?`,
-		item.Value, item.Id, item.Ver)
+		m.Value, m.ID, m.Ver)
 	return err
 }

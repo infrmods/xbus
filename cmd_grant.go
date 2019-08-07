@@ -10,6 +10,7 @@ import (
 	"github.com/infrmods/xbus/apps"
 )
 
+// GrantCmd grant cmd
 type GrantCmd struct {
 	isConfigs  bool
 	isServices bool
@@ -19,18 +20,22 @@ type GrantCmd struct {
 	canWrite   bool
 }
 
+// Name cmd name
 func (cmd *GrantCmd) Name() string {
 	return "grant"
 }
 
+// Synopsis cmd synopsis
 func (cmd *GrantCmd) Synopsis() string {
 	return "grant permission"
 }
 
+// Usage cmd usage
 func (cmd *GrantCmd) Usage() string {
 	return "grant [OPTIONS] target content\n"
 }
 
+// SetFlags cmd set flags
 func (cmd *GrantCmd) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&cmd.isConfigs, "configs", false, "list config perms")
 	f.BoolVar(&cmd.isServices, "services", false, "list services perms")
@@ -40,6 +45,7 @@ func (cmd *GrantCmd) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&cmd.canWrite, "write", false, "need write")
 }
 
+// Execute cmd execute
 func (cmd *GrantCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface{}) subcommands.ExitStatus {
 	x := NewXBus()
 	db := x.NewDB()
@@ -64,7 +70,7 @@ func (cmd *GrantCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface{
 				fmt.Printf("no such group: %s\n", args[0])
 				return subcommands.ExitFailure
 			}
-			perm.TargetId = group.Id
+			perm.TargetID = group.ID
 		} else {
 			glog.Errorf("get group(%v) fail: %v", args[0], err)
 			return subcommands.ExitFailure
@@ -72,14 +78,14 @@ func (cmd *GrantCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface{
 	} else {
 		perm.TargetType = apps.PermTargetApp
 		if args[0] == "public" {
-			perm.TargetId = apps.PermPublicTargetId
+			perm.TargetID = apps.PermPublicTargetID
 		} else {
 			if app, err := apps.GetAppByName(db, args[0]); err == nil {
 				if app == nil {
 					fmt.Printf("no such app: %s\n", args[0])
 					return subcommands.ExitFailure
 				}
-				perm.TargetId = app.Id
+				perm.TargetID = app.ID
 			} else {
 				glog.Errorf("get app(%v), fail: %v", args[0], err)
 				return subcommands.ExitFailure

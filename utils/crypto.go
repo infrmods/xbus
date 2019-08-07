@@ -9,6 +9,7 @@ import (
 	"fmt"
 )
 
+// NewPrivateKey new private key
 func NewPrivateKey(ecdsaCurve string, rsaBits int) (crypto.Signer, error) {
 	switch ecdsaCurve {
 	case "":

@@ -14,6 +14,7 @@ import (
 	"github.com/infrmods/xbus/utils"
 )
 
+// GenRootCmd gen root key/cert
 type GenRootCmd struct {
 	Organization string
 	CommonName   string
@@ -25,18 +26,22 @@ type GenRootCmd struct {
 	KeyFile  string
 }
 
+// Name cmd name
 func (cmd *GenRootCmd) Name() string {
 	return "gen-root"
 }
 
+// Synopsis cmd synopsis
 func (cmd *GenRootCmd) Synopsis() string {
 	return "generate root cert/key"
 }
 
+// Usage cmd usage
 func (cmd *GenRootCmd) Usage() string {
 	return ""
 }
 
+// SetFlags cmd set flags
 func (cmd *GenRootCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.Organization, "org", "XBus", "organization name")
 	f.StringVar(&cmd.CommonName, "cn", "XBus CA", "common name")
@@ -47,6 +52,7 @@ func (cmd *GenRootCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.KeyFile, "key-out", "rootkey.pem", "key output file")
 }
 
+// Execute cmd execute
 func (cmd *GenRootCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface{}) subcommands.ExitStatus {
 	privKey, err := utils.NewPrivateKey(cmd.EcdsaCruve, cmd.RSABits)
 	if err != nil {

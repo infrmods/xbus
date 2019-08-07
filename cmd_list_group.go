@@ -12,24 +12,30 @@ import (
 	"github.com/infrmods/xbus/apps"
 )
 
+// ListGroupCmd list group cmd
 type ListGroupCmd struct{}
 
+// Name cmd name
 func (cmd *ListGroupCmd) Name() string {
 	return "list-group"
 }
 
+// Synopsis cmd synopsis
 func (cmd *ListGroupCmd) Synopsis() string {
 	return "list groups"
 }
 
+// Usage cmd usage
 func (cmd *ListGroupCmd) Usage() string {
 	return ""
 }
 
+// SetFlags cmd set flags
 func (cmd *ListGroupCmd) SetFlags(f *flag.FlagSet) {
 
 }
 
+// Execute cmd execute
 func (cmd *ListGroupCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interface{}) subcommands.ExitStatus {
 	x := NewXBus()
 	db := x.NewDB()
@@ -42,9 +48,9 @@ func (cmd *ListGroupCmd) Execute(_ context.Context, f *flag.FlagSet, v ...interf
 	fmt.Fprintf(w, "id\tstatus\tname\tcreate time\tmodify time\n")
 	for _, group := range groups {
 		fmt.Fprintf(w, "%d\t%d\t%s\t%s\t%s\n",
-			group.Id, group.Status, group.Name,
-			group.CreateTime.Format(TIME_FMT),
-			group.ModifyTime.Format(TIME_FMT))
+			group.ID, group.Status, group.Name,
+			group.CreateTime.Format(timeFmt),
+			group.ModifyTime.Format(timeFmt))
 	}
 	w.Flush()
 	return subcommands.ExitSuccess

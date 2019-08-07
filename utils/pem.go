@@ -11,6 +11,7 @@ import (
 	"os"
 )
 
+// WritePem write pem
 func WritePem(path string, perm os.FileMode, typ string, data []byte) error {
 	f, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, perm)
 	if err != nil {
@@ -21,11 +22,13 @@ func WritePem(path string, perm os.FileMode, typ string, data []byte) error {
 	return err
 }
 
+// EncodeToPem encode to pem
 func EncodeToPem(typ string, data []byte) string {
 	block := pem.Block{Type: typ, Bytes: data}
 	return (string)(pem.EncodeToMemory(&block))
 }
 
+// EncodePrivateKeyToPem encode private key to pem
 func EncodePrivateKeyToPem(key crypto.Signer) (string, error) {
 	switch k := key.(type) {
 	case *rsa.PrivateKey:
@@ -41,6 +44,7 @@ func EncodePrivateKeyToPem(key crypto.Signer) (string, error) {
 	}
 }
 
+// WritePrivateKey write private key
 func WritePrivateKey(path string, perm os.FileMode, key crypto.Signer) error {
 	switch k := key.(type) {
 	case *rsa.PrivateKey:
@@ -56,10 +60,12 @@ func WritePrivateKey(path string, perm os.FileMode, key crypto.Signer) error {
 	}
 }
 
+// WriteCert write cert
 func WriteCert(path string, perm os.FileMode, derBytes []byte) error {
 	return WritePem(path, perm, "CERTIFICATE", derBytes)
 }
 
+// ReadPEM read pem
 func ReadPEM(path string) (*pem.Block, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -79,17 +85,19 @@ func ReadPEM(path string) (*pem.Block, error) {
 	return block, nil
 }
 
+// ReadPEMCertificate read cert from pem
 func ReadPEMCertificate(path string) (*x509.Certificate, error) {
-	if block, err := ReadPEM(path); err == nil {
-		if block.Type != "CERTIFICATE" {
-			return nil, fmt.Errorf("invalid cert(%s) type: %s", path, block.Type)
-		}
-		if cert, err := x509.ParseCertificate(block.Bytes); err == nil {
-			return cert, nil
-		} else {
-			return nil, fmt.Errorf("parse cert(%s) fail: %v", path, err)
-		}
-	} else {
+	block, err := ReadPEM(path)
+	if err != nil {
 		return nil, err
 	}
+
+	if block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("invalid cert(%s) type: %s", path, block.Type)
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse cert(%s) fail: %v", path, err)
+	}
+	return cert, nil
 }

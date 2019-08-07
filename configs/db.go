@@ -2,19 +2,23 @@ package configs
 
 import (
 	"database/sql"
+	"time"
+
 	"github.com/gocomm/dbutil"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
-	"time"
 )
 
 const (
-	ConfigStatusOk      = 0
+	// ConfigStatusOk config status ok
+	ConfigStatusOk = 0
+	// ConfigStatusDeleted config status deleted
 	ConfigStatusDeleted = -1
 )
 
+// DBConfigItem db config table
 type DBConfigItem struct {
-	Id         int64     `json:"id"`
+	ID         int64     `json:"id"`
 	Status     int       `json:"-"`
 	Tag        string    `json:"tag"`
 	Name       string    `json:"name"`
@@ -23,6 +27,7 @@ type DBConfigItem struct {
 	ModifyTime time.Time `json:"modify_time"`
 }
 
+// GetDBConfig get db config
 func GetDBConfig(db *sql.DB, name string) (*DBConfigItem, error) {
 	var item DBConfigItem
 	if err := dbutil.Query(db, &item, `select * from configs where
@@ -35,6 +40,7 @@ func GetDBConfig(db *sql.DB, name string) (*DBConfigItem, error) {
 	}
 }
 
+// GetDBConfigCount get db config count
 func GetDBConfigCount(db *sql.DB, tag, prefix string) (int64, error) {
 	args := make([]interface{}, 0, 3)
 	q := `select count(*) from configs where status=?`
@@ -50,19 +56,21 @@ func GetDBConfigCount(db *sql.DB, tag, prefix string) (int64, error) {
 	}
 
 	var count int64
-	if err := dbutil.Query(db, &count, q, args...); err == nil {
-		return count, nil
-	} else {
+	err := dbutil.Query(db, &count, q, args...)
+	if err != nil {
 		return 0, err
 	}
+	return count, nil
 }
 
+// ConfigInfo config info
 type ConfigInfo struct {
 	Tag        *string   `json:"tag"`
 	Name       string    `json:"name"`
 	ModifyTime time.Time `json:"modify_time"`
 }
 
+// ListDBConfigs list db configs
 func ListDBConfigs(db *sql.DB, tag, prefix string, skip, limit int) ([]ConfigInfo, error) {
 	args := make([]interface{}, 0, 3)
 	q := `select tag,name,modify_time from configs where status=?`
@@ -80,24 +88,25 @@ func ListDBConfigs(db *sql.DB, tag, prefix string, skip, limit int) ([]ConfigInf
 	args = append(args, limit)
 
 	var items []ConfigInfo
-	if err := dbutil.Query(db, &items, q, args...); err == nil {
-		return items, nil
-	} else {
+	err := dbutil.Query(db, &items, q, args...)
+	if err != nil {
 		return nil, err
 	}
+	return items, nil
 }
 
+// ConfigHistory config history
 type ConfigHistory struct {
-	Id         int64     `json:"id"`
+	ID         int64     `json:"id"`
 	Tag        string    `json:"tag"`
 	Name       string    `json:"name"`
-	AppId      int64     `json:"modified_by"`
+	AppID      int64     `json:"modified_by"`
 	Remark     string    `json:"remark"`
 	Value      string    `json:"value"`
 	CreateTime time.Time `json:"create_time"`
 }
 
-func (ctrl *ConfigCtrl) setDBConfig(tag, name string, appId int64, remark, value string) (rerr error) {
+func (ctrl *ConfigCtrl) setDBConfig(tag, name string, appID int64, remark, value string) (rerr error) {
 	tx, err := ctrl.db.Begin()
 	if err != nil {
 		glog.Errorf("new db tx fail: %v", err)
@@ -126,17 +135,17 @@ func (ctrl *ConfigCtrl) setDBConfig(tag, name string, appId int64, remark, value
 		return utils.NewError(utils.EcodeSystemError, "update db config fail")
 	}
 	if _, err := tx.Exec(`insert into config_histories(tag, name,app_id,remark,value,create_time)
-                          values(?,?,?,?,?,now())`, tagV, name, appId, remark, value); err != nil {
+                          values(?,?,?,?,?,now())`, tagV, name, appID, remark, value); err != nil {
 		glog.Errorf("insert db config history fail: %v", err)
 		return utils.NewError(utils.EcodeSystemError, "insert db config history fail")
 	}
 
-	if err := tx.Commit(); err == nil {
-		return nil
-	} else {
+	err = tx.Commit()
+	if err != nil {
 		glog.Errorf("set db config(%s), commit fail: %v", name, err)
 		return utils.NewError(utils.EcodeSystemError, "commit db fail")
 	}
+	return nil
 }
 
 func (ctrl *ConfigCtrl) deleteDBConfig(name string) error {
@@ -146,9 +155,10 @@ func (ctrl *ConfigCtrl) deleteDBConfig(name string) error {
 	return nil
 }
 
+// AppConfigState app config state table
 type AppConfigState struct {
-	Id         int64     `json:"id"`
-	AppId      int64     `json:"app_id"`
+	ID         int64     `json:"id"`
+	AppID      int64     `json:"app_id"`
 	AppNode    string    `json:"app_node"`
 	ConfigName string    `json:"config_name"`
 	Version    int64     `json:"version"`
@@ -156,18 +166,17 @@ type AppConfigState struct {
 	ModifyTime time.Time `json:"modify_time"`
 }
 
-func (ctrl *ConfigCtrl) changeAppConfigState(appId int64, appNode, configName string, version int64) error {
-	if appId <= 0 {
+func (ctrl *ConfigCtrl) changeAppConfigState(appID int64, appNode, configName string, version int64) error {
+	if appID <= 0 {
 		return nil
 	}
-
-	if _, err := ctrl.db.Exec(`insert into app_config_states(app_id,app_node,config_name,version,create_time,modify_time)
+	_, err := ctrl.db.Exec(`insert into app_config_states(app_id,app_node,config_name,version,create_time,modify_time)
                             values(?,?,?,?,now(),now())
                             on duplicate key update version=?`,
-		appId, appNode, configName, version, version); err != nil {
-		glog.Errorf("change app(%d - %s) config(%s) state(ver: %d) fail: %v", appId, appNode, configName, version, err)
+		appID, appNode, configName, version, version)
+	if err != nil {
+		glog.Errorf("change app(%d - %s) config(%s) state(ver: %d) fail: %v", appID, appNode, configName, version, err)
 		return utils.NewError(utils.EcodeSystemError, "change app config state fail")
-	} else {
-		return nil
 	}
+	return nil
 }

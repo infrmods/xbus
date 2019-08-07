@@ -29,12 +29,12 @@ type ServiceDescV1 struct {
 
 // Marshal marshal impl
 func (desc *ServiceDescV1) Marshal() ([]byte, error) {
-	if data, err := json.Marshal(desc); err == nil {
-		return data, nil
-	} else {
+	data, err := json.Marshal(desc)
+	if err != nil {
 		glog.Errorf("marshal service-desc(%#v) fail: %v", desc, err)
 		return nil, utils.NewSystemError("marshal service-desc fail")
 	}
+	return data, nil
 }
 
 // ServiceEndpoint service endpoint
@@ -45,12 +45,12 @@ type ServiceEndpoint struct {
 
 // Marshal marshal impl
 func (endpoint *ServiceEndpoint) Marshal() ([]byte, error) {
-	if data, err := json.Marshal(endpoint); err == nil {
-		return data, nil
-	} else {
+	data, err := json.Marshal(endpoint)
+	if err != nil {
 		glog.Errorf("marshal endpoint(%#v) fail: %v", endpoint, err)
 		return nil, utils.NewSystemError("marshal endpoint fail")
 	}
+	return data, nil
 }
 
 // ServiceZoneV1 service zone
@@ -258,14 +258,14 @@ func (ctrl *ServiceCtrl) Update(ctx context.Context, service, zone, addr string,
 	}
 
 	txn := ctrl.etcdClient.Txn(ctx).If(clientv3.Compare(clientv3.Version(key), ">", 0)).Then(clientv3.OpPut(key, string(data)))
-	if resp, err := txn.Commit(); err != nil {
+	resp, err := txn.Commit()
+	if err != nil {
 		return utils.CleanErr(err, "update fail", "tnx update(%s) fail: %v", key, err)
-	} else {
-		if resp.Succeeded {
-			return nil
-		}
-		return utils.NewError(utils.EcodeNotFound, "")
 	}
+	if resp.Succeeded {
+		return nil
+	}
+	return utils.NewError(utils.EcodeNotFound, "")
 }
 
 // Query query service
@@ -278,18 +278,19 @@ func (ctrl *ServiceCtrl) Query(ctx context.Context, clientIP net.IP, service str
 
 func (ctrl *ServiceCtrl) _query(ctx context.Context, clientIP net.IP, serviceKey string) (*ServiceV1, int64, error) {
 	key := ctrl.serviceEntryPrefix(serviceKey)
-	if resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix()); err == nil {
-		if len(resp.Kvs) == 0 {
-			return nil, 0, utils.Errorf(utils.EcodeNotFound, "no such service: %s", serviceKey)
-		}
-		if service, err := ctrl.makeService(clientIP, serviceKey, resp.Kvs); err == nil {
-			return service, resp.Header.Revision, nil
-		} else {
-			return nil, 0, err
-		}
-	} else {
+	resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix())
+	if err != nil {
 		return nil, 0, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", key, err)
 	}
+
+	if len(resp.Kvs) == 0 {
+		return nil, 0, utils.Errorf(utils.EcodeNotFound, "no such service: %s", serviceKey)
+	}
+	service, err := ctrl.makeService(clientIP, serviceKey, resp.Kvs)
+	if err != nil {
+		return nil, 0, err
+	}
+	return service, resp.Header.Revision, nil
 }
 
 // Watch watch service
