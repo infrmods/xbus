@@ -321,6 +321,7 @@ func (server *Server) registerConfigAPIs(g *echo.Group) {
 func (server *Server) registerAppAPIs(g *echo.Group) {
 	g.GET("/:name/cert", echo.HandlerFunc(server.getAppCert))
 	g.GET("/:name/nodes", echo.HandlerFunc(server.watchAppNodes))
+	g.GET("/:name/online", echo.HandlerFunc(server.isAppNodeOnline))
 	g.GET("", echo.HandlerFunc(server.listApp))
 	g.PUT("", echo.HandlerFunc(server.newApp))
 }

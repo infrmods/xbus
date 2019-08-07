@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
-	"fmt"
 	"math/big"
 	"net"
 	"regexp"
@@ -288,17 +287,17 @@ func (ctrl *AppCtrl) HasAnyPrefixPerm(typ int, appID int64, groupIDs []int64, ne
 
 // AppNode app node
 type AppNode struct {
-	Address string `json:"address"`
-	Label   string `json:"label"`
-	Config  string `json:"config"`
+	Label  string `json:"label"`
+	Key    string `json:"key"`
+	Config string `json:"config"`
 }
 
 const holdValue = "{}"
 
 // PlugAppNode plug app node
 func (ctrl *AppCtrl) PlugAppNode(ctx context.Context, appName string, node *AppNode, leaseID clientv3.LeaseID) (bool, error) {
-	if node.Address == "" {
-		return false, utils.Errorf(utils.EcodeInvalidAddress, "invalid app node address(empty)")
+	if node.Key == "" {
+		return false, utils.Errorf(utils.EcodeInvalidAddress, "invalid app node key(empty)")
 	}
 	if node.Config == "" {
 		return false, utils.Errorf(utils.EcodeInvalidValue, "invalid app node config(empty)")
@@ -308,14 +307,14 @@ func (ctrl *AppCtrl) PlugAppNode(ctx context.Context, appName string, node *AppN
 		label = "default"
 	}
 
-	holdKey := fmt.Sprintf("%s/%s/%s/node_%s", ctrl.config.KeyPrefix, appName, label, node.Address)
+	holdKey := ctrl.nodeHoldKey(appName, label, node.Key)
 	if _, err := ctrl.etcdClient.Txn(ctx).If(
 		clientv3.Compare(clientv3.Value(holdKey), "=", holdValue)).Else(
 		clientv3.OpPut(holdKey, holdValue)).Commit(); err != nil {
 		return false, utils.CleanErr(err, "put app holdKey fail", "put app holdKey faial: %v", err)
 	}
 
-	onlineKey := fmt.Sprintf("%s/%s/%s/node_%s/online", ctrl.config.KeyPrefix, appName, label, node.Address)
+	onlineKey := ctrl.nodeOnlineKey(appName, label, node.Key)
 	newOnlineNode := false
 	resp, err := ctrl.etcdClient.Get(ctx, onlineKey)
 	if err != nil {
@@ -338,25 +337,22 @@ type AppNodes struct {
 	Revision int64              `json:"revision"`
 }
 
-var rNodeKey = regexp.MustCompile(`/node_([^/]+)$`)
-var rNodeOnlineKey = regexp.MustCompile(`/node_([^/]+)/online$`)
-
 func (ctrl *AppCtrl) queryAppNodes(ctx context.Context, name, label string) (*AppNodes, error) {
-	key := fmt.Sprintf("%s/%s/%s/", ctrl.config.KeyPrefix, name, label)
+	key := ctrl.nodeKeyPrefix(name, label)
 	resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix())
 	if err != nil {
 		return nil, utils.CleanErr(err, "query fail", "query app nodes fail: %v", err)
 	}
 	nodes := make(map[string]*string)
 	for _, kv := range resp.Kvs {
-		if matches := rNodeKey.FindStringSubmatch(string(kv.Key)); matches != nil {
-			_, ok := nodes[matches[1]]
+		if nodeKey := ctrl.parseHoldNodeKey(string(kv.Key)); nodeKey != "" {
+			_, ok := nodes[nodeKey]
 			if !ok {
-				nodes[matches[1]] = nil
+				nodes[nodeKey] = nil
 			}
-		} else if matches = rNodeOnlineKey.FindStringSubmatch(string(kv.Key)); matches != nil {
+		} else if nodeKey := ctrl.parseOnlineNodeKey(string(kv.Key)); nodeKey != "" {
 			config := string(kv.Value)
-			nodes[matches[1]] = &config
+			nodes[nodeKey] = &config
 		}
 	}
 	return &AppNodes{Nodes: nodes, Revision: resp.Header.Revision}, nil
@@ -364,21 +360,35 @@ func (ctrl *AppCtrl) queryAppNodes(ctx context.Context, name, label string) (*Ap
 
 // WatchAppNodes watch app nodes
 func (ctrl *AppCtrl) WatchAppNodes(ctx context.Context, name, label string, revision int64) (*AppNodes, error) {
-	key := fmt.Sprintf("%s/%s/%s/", ctrl.config.KeyPrefix, name, label)
+	prefix := ctrl.nodeKeyPrefix(name, label)
 	if revision > 0 {
 		watcher := clientv3.NewWatcher(ctrl.etcdClient)
 		defer watcher.Close()
-		<-watcher.Watch(ctx, key, clientv3.WithPrefix(), clientv3.WithRev(revision))
+		<-watcher.Watch(ctx, prefix, clientv3.WithPrefix(), clientv3.WithRev(revision))
 	}
 
 	return ctrl.queryAppNodes(ctx, name, label)
 }
 
 // RemoveAppNode remove app node
-func (ctrl *AppCtrl) RemoveAppNode(ctx context.Context, name, label, address string) error {
-	key := fmt.Sprintf("%s/%s/%s/node_%s", ctrl.config.KeyPrefix, name, label, address)
-	if _, err := ctrl.etcdClient.Delete(ctx, key); err != nil {
+func (ctrl *AppCtrl) RemoveAppNode(ctx context.Context, name, label, key string) error {
+	holdKey := ctrl.nodeHoldKey(name, label, key)
+	if _, err := ctrl.etcdClient.Delete(ctx, holdKey); err != nil {
 		return utils.CleanErr(err, "delete app node fail", "delete app node fail: %v", err)
 	}
 	return nil
+}
+
+// IsAppNodeOnline is app node online
+func (ctrl *AppCtrl) IsAppNodeOnline(ctx context.Context, name, label, key string) (bool, error) {
+	onlineKey := ctrl.nodeOnlineKey(name, label, key)
+	resp, err := ctrl.etcdClient.Get(ctx, onlineKey)
+	if err != nil {
+		code, err := utils.CleanErrWithCode(err, "check app node online fail", "get app online node fail: %v", err)
+		if code == codes.NotFound {
+			return false, nil
+		}
+		return false, err
+	}
+	return len(resp.Kvs) > 0, nil
 }

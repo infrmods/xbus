@@ -108,3 +108,21 @@ func (server *Server) watchAppNodes(c echo.Context) error {
 	}
 	return JSONResult(c, nodes)
 }
+
+func (server *Server) isAppNodeOnline(c echo.Context) error {
+	appName := c.ParamValues()[0]
+	label := c.QueryParam("label")
+	if label == "" {
+		label = "default"
+	}
+	key := c.QueryParam("key")
+	if key == "" {
+		return JSONErrorf(c, utils.EcodeMissingParam, "missing key")
+	}
+
+	online, err := server.apps.IsAppNodeOnline(context.Background(), appName, label, key)
+	if err != nil {
+		return JSONError(c, err)
+	}
+	return JSONResult(c, online)
+}
