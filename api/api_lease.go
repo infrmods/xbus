@@ -81,8 +81,8 @@ func (server *Server) revokeLease(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	address := c.QueryParam("rm_node_address")
-	if address != "" {
+	nodeKey := c.QueryParam("rm_node_key")
+	if nodeKey != "" {
 		app := server.app(c)
 		if app == nil {
 			return JSONErrorf(c, utils.EcodeInvalidParam, "missing app config")
@@ -91,7 +91,7 @@ func (server *Server) revokeLease(c echo.Context) error {
 		if label == "" {
 			label = "default"
 		}
-		if err := server.apps.RemoveAppNode(context.Background(), app.Name, label, address); err != nil {
+		if err := server.apps.RemoveAppNode(context.Background(), app.Name, label, nodeKey); err != nil {
 			return JSONError(c, err)
 		}
 	}
