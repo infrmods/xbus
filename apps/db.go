@@ -209,15 +209,15 @@ func GetPerms(db *sql.DB, typ int, targetType *int, targetID *int64,
 
 	q := `select * from perms where perm_type=?`
 	if targetType != nil {
-		q += ` and targetType=?`
+		q += ` and target_type=?`
 		args = append(args, *targetType)
 	}
 	if targetID != nil {
-		q += ` and targetID=?`
+		q += ` and target_id=?`
 		args = append(args, *targetID)
 	}
 	if canWrite != nil {
-		q += ` and canWrite=?`
+		q += ` and can_write=?`
 		args = append(args, *canWrite)
 	}
 	if prefix != nil {
@@ -237,11 +237,11 @@ func GetPerms(db *sql.DB, typ int, targetType *int, targetID *int64,
 func InsertPerm(db *sql.DB, perm *Perm) error {
 	var query string
 	if perm.CanWrite {
-		query = `insert into perms(perm_type, targetType, targetID, canWrite, content)
+		query = `insert into perms(perm_type, target_type, target_id, can_write, content)
                  values(?, ?, ?, ?, ?)
-                 on duplicate key update canWrite=true`
+                 on duplicate key update can_write=true`
 	} else {
-		query = `insert ignore into perms(perm_type, targetType, targetID, canWrite, content)
+		query = `insert ignore into perms(perm_type, target_type, target_id, can_write, content)
                  values(?, ?, ?, ?, ?)`
 	}
 	if id, err := dbutil.Insert(db, query, perm.PermType, perm.TargetType, perm.TargetID,
@@ -259,23 +259,23 @@ func InsertPerm(db *sql.DB, perm *Perm) error {
 func HasAnyPrefixPerm(db *sql.DB, permType int, appID int64, groupIDs []int64, needWrite bool, content string) (bool, error) {
 	var extra string
 	if needWrite {
-		extra = ` and canWrite=true`
+		extra = ` and can_write=true`
 	}
 	var count int64
 	var err error
 	if appID == PermPublicTargetID {
 		err = dbutil.Query(db, &count,
 			`select count(*) from perms
-             where targetType=? and targetID=? and
+             where target_type=? and target_id=? and
                    perm_type=? and ? like CONCAT(content, "%")`+extra,
 			PermTargetApp, PermPublicTargetID,
 			permType, content)
 	} else {
 		err = dbutil.Query(db, &count,
 			`select count(*) from perms
-             where ((targetType=? and targetID in (?)) or
-                    (targetType=? and targetID=?) or
-                    targetID=?) and
+             where ((target_type=? and target_id in (?)) or
+                    (target_type=? and target_id=?) or
+                    target_id=?) and
                    perm_type=? and ? like CONCAT(content, "%")`+extra,
 			PermTargetGroup, dbutil.NumList(groupIDs),
 			PermTargetApp, appID,
