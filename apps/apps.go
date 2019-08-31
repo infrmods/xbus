@@ -8,6 +8,8 @@ import (
 	"database/sql"
 	"math/big"
 	"net"
+	"os"
+	"path"
 	"regexp"
 	"strings"
 
@@ -69,11 +71,13 @@ func (g *dbSerialGenerator) Generate() (*big.Int, error) {
 
 // Config module config
 type Config struct {
-	Cert         CertsConfig
-	EcdsaCruve   string
-	RSABits      int    `default:"2048"`
-	Organization string `default:"XBus"`
-	KeyPrefix    string `default:"/apps" yaml:"key_prefix"`
+	Cert                  CertsConfig
+	EcdsaCruve            string
+	RSABits               int    `default:"2048"`
+	Organization          string `default:"XBus"`
+	KeyPrefix             string `default:"/apps" yaml:"key_prefix"`
+	DumpKeyCertDir        string `yaml:"dump_keycert_dir"`
+	DumpKeyCertWithAppDir bool   `default:"true" yaml:"dump_keycert_with_appdir"`
 }
 
 // AppCtrl app ctrl
@@ -145,7 +149,29 @@ func (ctrl *AppCtrl) NewApp(app *App, key crypto.Signer, dnsNames []string, ips 
 		glog.Errorf("insert app(%s) fail: %v", app.Name, err)
 		return nil, utils.NewSystemError("create app fail")
 	}
+	ctrl.dumpKeyCert(app, key)
 	return key, nil
+}
+
+func (ctrl *AppCtrl) dumpKeyCert(app *App, key crypto.Signer) {
+	if ctrl.config.DumpKeyCertDir != "" {
+		dir := ctrl.config.DumpKeyCertDir
+		if ctrl.config.DumpKeyCertWithAppDir {
+			dir = path.Join(dir, app.Name)
+		}
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				glog.Errorf("create keycert dir(%s) fail: %v", dir, err)
+				return
+			}
+		}
+		if err := utils.WriteFile(path.Join(dir, app.Name+"key.pem"), 0600, []byte(app.PrivateKey)); err != nil {
+			glog.Warningf("dump key(%s) fail: %v", app.Name, err)
+		}
+		if err := utils.WriteFile(path.Join(dir, app.Name+"cert.pem"), 0644, []byte(app.Cert)); err != nil {
+			glog.Warningf("dump cert(%s) fail: %v", app.Name, err)
+		}
+	}
 }
 
 // GetPerms get perms
