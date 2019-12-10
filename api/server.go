@@ -86,7 +86,6 @@ func (server *Server) prepare() {
 		}))
 	}
 	server.e.Use(echo.MiddlewareFunc(server.verifyApp))
-	server.registerV0ServiceAPIs(server.e.Group("/api/services"))
 	server.registerV1ServiceAPIs(server.e.Group("/api/v1/services"))
 	server.registerConfigAPIs(server.e.Group("/api/configs"))
 	server.registerAppAPIs(server.e.Group("/api/apps"))
@@ -264,24 +263,6 @@ func (server *Server) newPermChecker(permType int, needWrite bool) echo.Middlewa
 			return h(c)
 		})
 	})
-}
-
-func (server *Server) registerV0ServiceAPIs(g *echo.Group) {
-	g.POST("/:name/:version", echo.HandlerFunc(server.v0PlugService),
-		server.newPermChecker(apps.PermTypeService, true))
-	g.DELETE("/:name/:version/:id", echo.HandlerFunc(server.v0UnplugService),
-		server.newPermChecker(apps.PermTypeService, true))
-	g.POST("", echo.HandlerFunc(server.v0PlugAllService))
-	g.PUT("/:name/:version/:id", echo.HandlerFunc(server.v0UpdateService),
-		server.newPermChecker(apps.PermTypeService, true))
-	g.GET("", echo.HandlerFunc(server.v0SearchService))
-
-	if server.config.PermitPublicServiceQuery {
-		g.GET("/:name/:version", echo.HandlerFunc(server.v0QueryService))
-	} else {
-		g.GET("/:name/:version", echo.HandlerFunc(server.v0QueryService),
-			server.newPermChecker(apps.PermTypeService, false))
-	}
 }
 
 func (server *Server) registerV1ServiceAPIs(g *echo.Group) {

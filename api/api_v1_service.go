@@ -11,12 +11,24 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+const (
+	minServiceTTL       = 10 // in seconds
+	defaultServiceTTL   = 60 // in seconds
+	defaultWatchTimeout = 60 // in seconds
+)
+
+// ServicePlugResult service plug result
+type ServicePlugResult struct {
+	LeaseID clientv3.LeaseID `json:"lease_id"`
+	TTL     int64            `json:"ttl"`
+}
+
 func (server *Server) v1PlugService(c echo.Context) error {
 	ttl, ok, err := IntFormParamD(c, "ttl", 60)
 	if !ok {
 		return err
 	}
-	if ttl > 0 && ttl < _MinServiceTTL {
+	if ttl > 0 && ttl < minServiceTTL {
 		return JSONErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
 	}
 	leaseID, ok, err := IntFormParamD(c, "lease_id", 0)
@@ -37,10 +49,10 @@ func (server *Server) v1PlugService(c echo.Context) error {
 		return err
 	}
 
-	if leaseID, err := server.services.Plug(context.Background(),
+	if leaseID, err := server.services.PlugAll(context.Background(),
 		time.Duration(ttl)*time.Second, clientv3.LeaseID(leaseID),
-		&desc, &endpoint); err == nil {
-		return JSONResult(c, _ServicePlugResult{LeaseID: leaseID, TTL: ttl})
+		[]services.ServiceDescV1{desc}, &endpoint); err == nil {
+		return JSONResult(c, ServicePlugResult{LeaseID: leaseID, TTL: ttl})
 	}
 	return JSONError(c, err)
 }
@@ -50,7 +62,7 @@ func (server *Server) v1PlugAllService(c echo.Context) error {
 	if !ok {
 		return err
 	}
-	if ttl > 0 && ttl < _MinServiceTTL {
+	if ttl > 0 && ttl < minServiceTTL {
 		return JSONErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
 	}
 	leaseID, ok, err := IntFormParamD(c, "lease_id", 0)
@@ -84,13 +96,13 @@ func (server *Server) v1PlugAllService(c echo.Context) error {
 		return err
 	}
 
-	newLeaseID, err := server.services.PlugAllService(context.Background(),
+	newLeaseID, err := server.services.PlugAll(context.Background(),
 		time.Duration(ttl)*time.Second, clientv3.LeaseID(leaseID),
 		desces, &endpoint)
 	if err != nil {
 		return JSONError(c, err)
 	}
-	return JSONResult(c, _ServicePlugResult{LeaseID: newLeaseID, TTL: ttl})
+	return JSONResult(c, ServicePlugResult{LeaseID: newLeaseID, TTL: ttl})
 }
 
 func (server *Server) v1UnplugService(c echo.Context) error {
@@ -139,7 +151,7 @@ func (server *Server) v1WatchService(c echo.Context) error {
 	if !ok {
 		return err
 	}
-	timeout, ok, err := IntQueryParamD(c, "timeout", _DefaultWatchTimeout)
+	timeout, ok, err := IntQueryParamD(c, "timeout", defaultWatchTimeout)
 	if !ok {
 		return err
 	}

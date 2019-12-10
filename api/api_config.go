@@ -137,7 +137,7 @@ func (server *Server) watch(c echo.Context) error {
 	if !ok {
 		return err
 	}
-	timeout, ok, err := IntQueryParamD(c, "timeout", _DefaultWatchTimeout)
+	timeout, ok, err := IntQueryParamD(c, "timeout", defaultWatchTimeout)
 	if !ok {
 		return err
 	}

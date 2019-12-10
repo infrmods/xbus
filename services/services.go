@@ -23,6 +23,7 @@ type ServiceDescV1 struct {
 	Service     string `json:"service"`
 	Zone        string `json:"zone,omitempty"`
 	Type        string `json:"type"`
+	Extension   string `json:"extension"`
 	Proto       string `json:"proto,omitempty"`
 	Description string `json:"description,omitempty"`
 }
@@ -159,52 +160,8 @@ func checkDesc(desc *ServiceDescV1) error {
 	return nil
 }
 
-// Plug plug service
-func (ctrl *ServiceCtrl) Plug(ctx context.Context,
-	ttl time.Duration, leaseID clientv3.LeaseID,
-	desc *ServiceDescV1, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
-	if err := checkDesc(desc); err != nil {
-		return 0, err
-	}
-	if endpoint.Address == "" {
-		return 0, utils.NewError(utils.EcodeInvalidEndpoint, "missing address")
-	}
-	if err := ctrl.checkAddress(endpoint.Address); err != nil {
-		return 0, err
-	}
-
-	descData, err := desc.Marshal()
-	endpointData, err := endpoint.Marshal()
-	if err != nil {
-		return 0, err
-	}
-	if err := ctrl.updateServiceDBItems([]ServiceDescV1{*desc}); err != nil {
-		return 0, err
-	}
-	if err := ctrl.ensureServiceDesc(ctx, desc.Service, desc.Zone, string(descData)); err != nil {
-		return 0, err
-	}
-	return ctrl.setServiceNode(ctx, ttl, leaseID,
-		ctrl.serviceKey(desc.Service, desc.Zone, endpoint.Address), string(endpointData))
-}
-
-// Unplug unplug service
-func (ctrl *ServiceCtrl) Unplug(ctx context.Context, service, zone, addr string) error {
-	if err := checkServiceZone(service, zone); err != nil {
-		return err
-	}
-	if err := ctrl.checkAddress(addr); err != nil {
-		return err
-	}
-	if _, err := ctrl.etcdClient.Delete(ctx, ctrl.serviceKey(service, zone, addr)); err != nil {
-		glog.Errorf("delete key(%s) fail: %v", ctrl.serviceKey(service, zone, addr), err)
-		return utils.NewSystemError("delete key fail")
-	}
-	return nil
-}
-
-// PlugAllService plug services
-func (ctrl *ServiceCtrl) PlugAllService(ctx context.Context,
+// PlugAll plug services
+func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 	ttl time.Duration, leaseID clientv3.LeaseID,
 	desces []ServiceDescV1, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
 	if endpoint.Address == "" {
@@ -243,29 +200,19 @@ func (ctrl *ServiceCtrl) PlugAllService(ctx context.Context,
 	return leaseID, nil
 }
 
-// Update update service endpoint
-func (ctrl *ServiceCtrl) Update(ctx context.Context, service, zone, addr string, endpoint *ServiceEndpoint) error {
+// Unplug unplug service
+func (ctrl *ServiceCtrl) Unplug(ctx context.Context, service, zone, addr string) error {
 	if err := checkServiceZone(service, zone); err != nil {
 		return err
 	}
 	if err := ctrl.checkAddress(addr); err != nil {
 		return err
 	}
-	key := ctrl.serviceKey(service, zone, addr)
-	data, err := endpoint.Marshal()
-	if err != nil {
-		return err
+	if _, err := ctrl.etcdClient.Delete(ctx, ctrl.serviceKey(service, zone, addr)); err != nil {
+		glog.Errorf("delete key(%s) fail: %v", ctrl.serviceKey(service, zone, addr), err)
+		return utils.NewSystemError("delete key fail")
 	}
-
-	txn := ctrl.etcdClient.Txn(ctx).If(clientv3.Compare(clientv3.Version(key), ">", 0)).Then(clientv3.OpPut(key, string(data)))
-	resp, err := txn.Commit()
-	if err != nil {
-		return utils.CleanErr(err, "update fail", "tnx update(%s) fail: %v", key, err)
-	}
-	if resp.Succeeded {
-		return nil
-	}
-	return utils.NewError(utils.EcodeNotFound, "")
+	return nil
 }
 
 // Query query service

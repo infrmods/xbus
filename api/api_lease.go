@@ -22,7 +22,7 @@ func (server *Server) grantLease(c echo.Context) error {
 	if !ok {
 		return err
 	}
-	if ttl > 0 && ttl < _MinServiceTTL {
+	if ttl > 0 && ttl < minServiceTTL {
 		return JSONErrorf(c, utils.EcodeInvalidParam, "invalid ttl: %d", ttl)
 	}
 	app := server.app(c)
