@@ -21,17 +21,18 @@ type DBServiceItemV1 struct {
 	Service     string    `json:"service"`
 	Zone        string    `json:"zone"`
 	Type        string    `json:"type"`
+	Extension   string    `json:"extension"`
 	Proto       string    `json:"proto"`
 	Description string    `json:"description"`
 	CreateTime  time.Time `json:"create_time"`
 	ModifyTime  time.Time `json:"modify_time"`
 }
 
-func (ctrl *ServiceCtrl) updateServiceDBItems(services []ServiceDescV1) (rerr error) {
+func (ctrl *ServiceCtrl) updateServiceDBItems(services []ServiceDescV1) (exts []string, rerr error) {
 	tx, err := ctrl.db.Begin()
 	if err != nil {
 		glog.Errorf("new db tx fail: %v", err)
-		return utils.NewError(utils.EcodeSystemError, "new db tx fail")
+		return nil, utils.NewError(utils.EcodeSystemError, "new db tx fail")
 	}
 	defer func() {
 		if rerr != nil {
@@ -41,44 +42,53 @@ func (ctrl *ServiceCtrl) updateServiceDBItems(services []ServiceDescV1) (rerr er
 		}
 	}()
 
-	for _, desc := range services {
+	oldExts := make([]string, len(services))
+	for i, desc := range services {
 		var id int64
 		var status int
 		var oldType string
+		var oldExt string
 		var oldProto string
 		var oldDesc string
-		row := tx.QueryRow(`select id, status, typ, proto from services
+		row := tx.QueryRow(`select id, status, typ, extension, proto from services
 			where service=? and zone=? for update`, desc.Service, desc.Zone)
-		if err := row.Scan(&id, &status, &oldType, &oldProto); err == nil {
-			if status != serviceStatusOk || oldType != desc.Type || oldProto != desc.Proto || oldDesc != desc.Description {
+		if err := row.Scan(&id, &status, &oldType, &oldExt, &oldProto); err == nil {
+			if oldExt != desc.Extension {
+				oldExts[i] = oldExt
+			}
+			if status != serviceStatusOk || oldType != desc.Type || oldExt != desc.Extension ||
+				oldProto != desc.Proto || oldDesc != desc.Description {
 				if !ctrl.config.PermitChangeDesc {
-					return utils.Errorf(utils.EcodeChangedServiceDesc,
+					return nil, utils.Errorf(utils.EcodeChangedServiceDesc,
 						"service-desc[%s] can't be change", desc.Service)
 				}
-				if _, err := tx.Exec("update services set status=?, typ=?, proto=?, description=? where id=?",
-					serviceStatusOk, desc.Type, desc.Proto, desc.Description, id); err != nil {
+				if _, err := tx.Exec(
+					"update services set status=?, typ=?, extension=?, proto=?, description=? where id=?",
+					serviceStatusOk, desc.Type, desc.Extension, desc.Proto, desc.Description, id,
+				); err != nil {
 					glog.Errorf("update db service(%s:%s) fail: %v", desc.Service, desc.Zone, err)
-					return utils.NewError(utils.EcodeSystemError, "update db service fail")
+					return nil, utils.NewError(utils.EcodeSystemError, "update db service fail")
 				}
 			}
 		} else if err == sql.ErrNoRows {
-			if _, err := tx.Exec(`insert into services(status, service, zone, typ, proto, 
-					description) values(?,?,?,?,?,?)`,
-				serviceStatusOk, desc.Service, desc.Zone, desc.Type, desc.Proto, desc.Description); err != nil {
+			if _, err := tx.Exec(
+				`insert into services(status, service, zone, typ, extension, proto, description) values(?,?,?,?,?,?)`,
+				serviceStatusOk, desc.Service, desc.Zone, desc.Type, desc.Extension, desc.Proto, desc.Description,
+			); err != nil {
 				glog.Errorf("insert db service(%s:%s) fail: %v", desc.Service, desc.Zone, err)
-				return utils.NewError(utils.EcodeSystemError, "insert db service fail")
+				return nil, utils.NewError(utils.EcodeSystemError, "insert db service fail")
 			}
 		} else {
 			glog.Errorf("query db service(%s:%s) fail: %v", desc.Service, desc.Zone, err)
-			return utils.NewError(utils.EcodeSystemError, "query db service fail")
+			return nil, utils.NewError(utils.EcodeSystemError, "query db service fail")
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
 		glog.Errorf("update db services fail: %v", err)
-		return utils.NewError(utils.EcodeSystemError, "update db service fail")
+		return nil, utils.NewError(utils.EcodeSystemError, "update db service fail")
 	}
-	return nil
+	return oldExts, nil
 }
 
 // ServiceItemV1 service item v1
