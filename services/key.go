@@ -1,11 +1,9 @@
 package services
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 
-	"github.com/coreos/etcd/clientv3"
 	"github.com/infrmods/xbus/utils"
 )
 
@@ -66,35 +64,4 @@ const serviceKeyNodePrefix = "node_"
 
 func (ctrl *ServiceCtrl) serviceKey(service, zone, addr string) string {
 	return fmt.Sprintf("%s/%s/%s/node_%s", ctrl.config.KeyPrefix, service, zone, addr)
-}
-
-func (ctrl *ServiceCtrl) ensureServiceDesc(ctx context.Context, service, zone, value string) error {
-	key := ctrl.serviceDescKey(service, zone)
-	txn := ctrl.etcdClient.Txn(ctx).If(
-		clientv3.Compare(clientv3.Value(key), "!=", value)).Then(clientv3.OpPut(key, value))
-	if _, err := txn.Commit(); err != nil {
-		return utils.CleanErr(err, "put service-desc fail", "exec service-desc txn fail: %v", err)
-	}
-	return nil
-}
-
-func (ctrl *ServiceCtrl) setServiceNode(ctx context.Context, leaseID clientv3.LeaseID,
-	desc *ServiceDescV1, addr, value string) (_ clientv3.LeaseID, rerr error) {
-	key := ctrl.serviceKey(desc.Service, desc.Zone, addr)
-
-	var opPut clientv3.Op
-	if leaseID > 0 {
-		opPut = clientv3.OpPut(key, value, clientv3.WithLease(leaseID))
-	} else {
-		opPut = clientv3.OpPut(key, value)
-	}
-	txn := ctrl.etcdClient.Txn(ctx).If(
-		clientv3.Compare(clientv3.Value(key), "=", value),
-		clientv3.Compare(clientv3.LeaseValue(key), "=", leaseID)).Then().Else(opPut)
-	if _, err := txn.Commit(); err != nil {
-		return 0, utils.CleanErr(err, "plug service fail",
-			"put service(%s) node fail: %v", key, err)
-	}
-
-	return leaseID, nil
 }

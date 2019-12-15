@@ -193,9 +193,9 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 		descKey := ctrl.serviceDescKey(desc.Service, desc.Zone)
 		updateOps = append(updateOps,
 			clientv3.OpTxn(
-				[]clientv3.Cmp{clientv3.Compare(clientv3.Value(descKey), "!=", descValue)},
-				[]clientv3.Op{clientv3.OpPut(descKey, descValue)},
+				[]clientv3.Cmp{clientv3.Compare(clientv3.Value(descKey), "=", descValue)},
 				nil,
+				[]clientv3.Op{clientv3.OpPut(descKey, descValue)},
 			))
 
 		nodeKey := ctrl.serviceKey(desc.Service, desc.Zone, endpoint.Address)
