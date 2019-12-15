@@ -13,7 +13,6 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
-	"google.golang.org/grpc/codes"
 )
 
 // DefaultZone default service zone
@@ -24,7 +23,6 @@ type ServiceDescV1 struct {
 	Service     string `json:"service"`
 	Zone        string `json:"zone,omitempty"`
 	Type        string `json:"type"`
-	Extension   string `json:"extension"`
 	Proto       string `json:"proto,omitempty"`
 	Description string `json:"description,omitempty"`
 }
@@ -78,7 +76,6 @@ type NetMapping struct {
 // Config service module config
 type Config struct {
 	KeyPrefix               string       `default:"/services" yaml:"key_prefix"`
-	PermitChangeDesc        bool         `default:"false" yaml:"permit_change_desc"`
 	NetMappings             []NetMapping `yaml:"net_mappings"`
 	BannedEndpointAddresses []string     `yaml:"banned_endpoint_addresses"`
 	bannedAddrRs            []*regexp.Regexp
@@ -185,26 +182,16 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 		}
 	}
 
-	oldExts, err := ctrl.updateServiceDBItems(desces)
-	if err != nil {
+	if err := ctrl.updateServiceDBItems(desces); err != nil {
 		return 0, err
 	}
-	for i, desc := range desces {
+	for _, desc := range desces {
 		descData, err := desc.Marshal()
 		if err != nil {
 			return 0, err
 		}
 		if err := ctrl.ensureServiceDesc(ctx, desc.Service, desc.Zone, string(descData)); err != nil {
 			return 0, err
-		}
-		if oldExts[i] != "" {
-			// TODO batch delete
-			key := ctrl.extensionKey(oldExts[i], desc.Zone, desc.Service)
-			if _, err := ctrl.etcdClient.Delete(ctx, key); err != nil {
-				if utils.GetErrCode(err) != codes.NotFound {
-					return 0, utils.CleanErr(err, "delete old ext key fail", "drop old ext key(%s) fail: %v", key, err)
-				}
-			}
 		}
 	}
 
@@ -289,94 +276,13 @@ func (ctrl *ServiceCtrl) Delete(ctx context.Context, serviceKey string, zone str
 			}
 		}
 		if len(resp.Kvs) > 0 {
-			resp, err := ctrl.etcdClient.Delete(ctx, entryPrefix, clientv3.WithPrefix(), clientv3.WithPrevKV())
+			_, err := ctrl.etcdClient.Delete(ctx, entryPrefix, clientv3.WithPrefix())
 			if err != nil {
 				return utils.CleanErr(err, "delete service keys fail", "delete service keys(%s) fail: %v", entryPrefix, err)
-			}
-			for _, kv := range resp.PrevKvs {
-				if strings.HasSuffix(string(kv.Key), "/"+serviceDescNodeKey) {
-					var desc ServiceDescV1
-					if err := json.Unmarshal(kv.Value, &desc); err == nil {
-						if desc.Extension != "" {
-							if _, err := ctrl.etcdClient.Delete(ctx, ctrl.extensionKey(desc.Extension, desc.Zone, desc.Service)); err != nil {
-								if utils.GetErrCode(err) != codes.NotFound {
-									glog.Errorf("delete service extension(%s %s) fail: %v", desc.Service, desc.Extension, err)
-								}
-							}
-						}
-					} else {
-						glog.Warningf("unmarkshal desc(%s) fail: %s", serviceKey, err)
-					}
-					break
-				}
 			}
 		}
 	} else {
 		return utils.CleanErr(err, "get service keys fail", "precheck delete(%s) fail: %v", entryPrefix, err)
 	}
 	return ctrl.deleteServiceDBItems(serviceKey, zone)
-}
-
-const (
-	// ExtensionPut ext put
-	ExtensionPut int = 0
-	// ExtensionDelete ext del
-	ExtensionDelete int = 1
-)
-
-// ExtensionEvent ext event
-type ExtensionEvent struct {
-	EventType int
-	Service   string
-	Zone      string
-	Extension string
-}
-
-// ExtensionWatchResult watch result
-type ExtensionWatchResult struct {
-	Events   []ExtensionEvent
-	Revision int64
-}
-
-// WatchExtension watch service-extensions
-func (ctrl *ServiceCtrl) WatchExtension(ctx context.Context, rev int64, ext, zone string) (*ExtensionWatchResult, error) {
-	watcher := clientv3.NewWatcher(ctrl.etcdClient)
-	defer watcher.Close()
-
-	var watchCh clientv3.WatchChan
-	if rev > 0 {
-		watchCh = watcher.Watch(ctx, ctrl.extensionKeyPrefix(ext, zone), clientv3.WithRev(rev))
-	} else {
-		watchCh = watcher.Watch(ctx, ctrl.extensionKeyPrefix(ext, zone))
-	}
-
-	for {
-		resp := <-watchCh
-		if resp.Canceled {
-			return nil, nil
-		}
-
-		events := make([]ExtensionEvent, 0, len(resp.Events))
-		for _, event := range resp.Events {
-			if key := ctrl.splitExtensionKey(string(event.Kv.Key)); key != nil {
-				var typ int
-				if event.IsCreate() {
-					typ = ExtensionPut
-				} else if event.Type == clientv3.EventTypeDelete {
-					typ = ExtensionDelete
-				} else {
-					continue
-				}
-				events = append(events, ExtensionEvent{
-					EventType: typ,
-					Service:   key.Service,
-					Zone:      key.Zone,
-					Extension: key.Extension,
-				})
-			}
-		}
-		if len(events) >= 0 {
-			return &ExtensionWatchResult{Events: events, Revision: resp.Header.Revision}, nil
-		}
-	}
 }

@@ -172,24 +172,3 @@ func (server *Server) v1DeleteService(c echo.Context) error {
 	}
 	return JSONOk(c)
 }
-
-func (server *Server) v1WatchServiceExtension(c echo.Context) error {
-	ext := c.ParamValues()[0]
-	zone := c.QueryParam("zone")
-	timeout, ok, err := IntQueryParamD(c, "timeout", defaultWatchTimeout)
-	if !ok {
-		return err
-	}
-	rev, ok, err := IntQueryParamD(c, "revision", 0)
-	if !ok {
-		return err
-	}
-
-	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
-	defer cancelFunc()
-	result, err := server.services.WatchExtension(ctx, rev, ext, zone)
-	if err != nil {
-		return JSONError(c, err)
-	}
-	return JSONResult(c, result)
-}
