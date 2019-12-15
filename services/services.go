@@ -346,8 +346,11 @@ func (ctrl *ServiceCtrl) WatchExtensions(ctx context.Context, ext string, revisi
 
 	for {
 		resp := <-watchCh
-		if resp.Canceled {
-			return nil, resp.Header.Revision, nil
+		if resp.Events == nil {
+			if err := resp.Err(); err != nil {
+				glog.Errorf("watch service extensions fail: %v", err)
+			}
+			return nil, 0, nil
 		}
 		events := make([]ExtensionEvent, 0, len(resp.Events))
 		for _, event := range resp.Events {
