@@ -174,6 +174,7 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 	if err != nil {
 		return 0, err
 	}
+	endpointValue := string(endpointData)
 	if ttl > 0 && leaseID == 0 {
 		if resp, err := ctrl.etcdClient.Lease.Grant(ctx, int64(ttl.Seconds())); err == nil {
 			leaseID = clientv3.LeaseID(resp.ID)
@@ -182,23 +183,46 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 		}
 	}
 
-	if err := ctrl.updateServiceDBItems(desces); err != nil {
-		return 0, err
-	}
+	updateOps := make([]clientv3.Op, 0, len(desces)*2)
 	for _, desc := range desces {
 		descData, err := desc.Marshal()
 		if err != nil {
 			return 0, err
 		}
-		if err := ctrl.ensureServiceDesc(ctx, desc.Service, desc.Zone, string(descData)); err != nil {
-			return 0, err
+		descValue := string(descData)
+		descKey := ctrl.serviceDescKey(desc.Service, desc.Zone)
+		updateOps = append(updateOps,
+			clientv3.OpTxn(
+				[]clientv3.Cmp{clientv3.Compare(clientv3.Value(descKey), "!=", descValue)},
+				[]clientv3.Op{clientv3.OpPut(descKey, descValue)},
+				nil,
+			))
+
+		nodeKey := ctrl.serviceKey(desc.Service, desc.Zone, endpoint.Address)
+		var opPut clientv3.Op
+		if leaseID > 0 {
+			opPut = clientv3.OpPut(nodeKey, endpointValue, clientv3.WithLease(leaseID))
+		} else {
+			opPut = clientv3.OpPut(nodeKey, endpointValue)
 		}
+		updateOps = append(updateOps,
+			clientv3.OpTxn(
+				[]clientv3.Cmp{
+					clientv3.Compare(clientv3.Value(nodeKey), "=", endpointValue),
+					clientv3.Compare(clientv3.LeaseValue(nodeKey), "=", leaseID),
+				},
+				nil,
+				[]clientv3.Op{opPut},
+			))
+	}
+	if _, err := ctrl.etcdClient.Txn(ctx).Then(updateOps...).Commit(); err != nil {
+		return 0, utils.CleanErr(err, "plug service fail",
+			"put services node fail: %v", err)
 	}
 
-	for _, desc := range desces {
-		if leaseID, err = ctrl.setServiceNode(ctx, leaseID, &desc, endpoint.Address, string(endpointData)); err != nil {
-			return 0, err
-		}
+	if err := ctrl.updateServiceDBItems(desces); err != nil {
+		glog.Errorf("update service db items fail: %v", err)
+		return 0, utils.NewError(utils.EcodeSystemError, "update db fail")
 	}
 	return leaseID, nil
 }

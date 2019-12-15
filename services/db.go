@@ -1,7 +1,8 @@
 package services
 
 import (
-	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gocomm/dbutil"
@@ -27,58 +28,18 @@ type DBServiceItemV1 struct {
 	ModifyTime  time.Time `json:"modify_time"`
 }
 
-func (ctrl *ServiceCtrl) updateServiceDBItems(services []ServiceDescV1) (rerr error) {
-	tx, err := ctrl.db.Begin()
-	if err != nil {
-		glog.Errorf("new db tx fail: %v", err)
-		return utils.NewError(utils.EcodeSystemError, "new db tx fail")
+func (ctrl *ServiceCtrl) updateServiceDBItems(services []ServiceDescV1) error {
+	sqlValues := make([]string, 0, len(services))
+	values := make([]interface{}, 0, len(services)*6)
+	for _, service := range services {
+		sqlValues = append(sqlValues, "(?,?,?,?,?,?)")
+		values = append(values, serviceStatusOk, service.Service, service.Zone, service.Type, service.Proto, service.Description)
 	}
-	defer func() {
-		if rerr != nil {
-			if err := tx.Rollback(); err != nil {
-				glog.Warningf("tx roolback fail: %v", err)
-			}
-		}
-	}()
-
-	for _, desc := range services {
-		var id int64
-		var status int
-		var oldType string
-		var oldProto string
-		var oldDesc string
-		row := tx.QueryRow(`select id, status, typ, proto from services
-			where service=? and zone=? for update`, desc.Service, desc.Zone)
-		if err := row.Scan(&id, &status, &oldType, &oldProto); err == nil {
-			if status != serviceStatusOk || oldType != desc.Type ||
-				oldProto != desc.Proto || oldDesc != desc.Description {
-				if _, err := tx.Exec(
-					"update services set status=?, typ=?,  proto=?, description=? where id=?",
-					serviceStatusOk, desc.Type, desc.Proto, desc.Description, id,
-				); err != nil {
-					glog.Errorf("update db service(%s:%s) fail: %v", desc.Service, desc.Zone, err)
-					return utils.NewError(utils.EcodeSystemError, "update db service fail")
-				}
-			}
-		} else if err == sql.ErrNoRows {
-			if _, err := tx.Exec(
-				`insert into services(status, service, zone, typ,  proto, description) values(?,?,?,?,?,?)`,
-				serviceStatusOk, desc.Service, desc.Zone, desc.Type, desc.Proto, desc.Description,
-			); err != nil {
-				glog.Errorf("insert db service(%s:%s) fail: %v", desc.Service, desc.Zone, err)
-				return utils.NewError(utils.EcodeSystemError, "insert db service fail")
-			}
-		} else {
-			glog.Errorf("query db service(%s:%s) fail: %v", desc.Service, desc.Zone, err)
-			return utils.NewError(utils.EcodeSystemError, "query db service fail")
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		glog.Errorf("update db services fail: %v", err)
-		return utils.NewError(utils.EcodeSystemError, "update db service fail")
-	}
-	return nil
+	sql := fmt.Sprintf(`insert into services(status, service, zone, typ, proto, description) values %s 
+						on duplicate key update status=values(status), typ=values(typ), proto=values(proto), description=values(description)`,
+		strings.Join(sqlValues, ","))
+	_, err := ctrl.db.Exec(sql, values...)
+	return err
 }
 
 // ServiceItemV1 service item v1
