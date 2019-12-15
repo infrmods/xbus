@@ -23,6 +23,7 @@ type ServiceDescV1 struct {
 	Service     string `json:"service"`
 	Zone        string `json:"zone,omitempty"`
 	Type        string `json:"type"`
+	Extension   string `json:"extension,omitempty"`
 	Proto       string `json:"proto,omitempty"`
 	Description string `json:"description,omitempty"`
 }
@@ -77,6 +78,7 @@ type NetMapping struct {
 type Config struct {
 	KeyPrefix               string       `default:"/services" yaml:"key_prefix"`
 	NetMappings             []NetMapping `yaml:"net_mappings"`
+	ExtNotifyTTL            int64        `default:"86400" yaml:"extension_nofiy_tty"`
 	BannedEndpointAddresses []string     `yaml:"banned_endpoint_addresses"`
 	bannedAddrRs            []*regexp.Regexp
 }
@@ -183,6 +185,7 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 		}
 	}
 
+	var notifyLeaseID clientv3.LeaseID
 	updateOps := make([]clientv3.Op, 0, len(desces)*2)
 	for _, desc := range desces {
 		descData, err := desc.Marshal()
@@ -191,11 +194,22 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 		}
 		descValue := string(descData)
 		descKey := ctrl.serviceDescKey(desc.Service, desc.Zone)
+		descPuts := []clientv3.Op{clientv3.OpPut(descKey, descValue)}
+		if desc.Extension != "" {
+			if notifyLeaseID == 0 {
+				resp, err := ctrl.etcdClient.Grant(ctx, ctrl.config.ExtNotifyTTL)
+				if err != nil {
+					return 0, utils.CleanErr(err, "create notify lease fail", "create ext notify lease fail: %v", err)
+				}
+				notifyLeaseID = resp.ID
+			}
+			descPuts = append(descPuts, clientv3.OpPut(ctrl.extNotifyKey(&desc), desc.Extension, clientv3.WithLease(notifyLeaseID)))
+		}
 		updateOps = append(updateOps,
 			clientv3.OpTxn(
 				[]clientv3.Cmp{clientv3.Compare(clientv3.Value(descKey), "=", descValue)},
 				nil,
-				[]clientv3.Op{clientv3.OpPut(descKey, descValue)},
+				descPuts,
 			))
 
 		nodeKey := ctrl.serviceKey(desc.Service, desc.Zone, endpoint.Address)
@@ -309,4 +323,47 @@ func (ctrl *ServiceCtrl) Delete(ctx context.Context, serviceKey string, zone str
 		return utils.CleanErr(err, "get service keys fail", "precheck delete(%s) fail: %v", entryPrefix, err)
 	}
 	return ctrl.deleteServiceDBItems(serviceKey, zone)
+}
+
+// ExtensionEvent extension event
+type ExtensionEvent struct {
+	Service string `json:"service"`
+	Zone    string `json:"zone"`
+}
+
+// WatchExtensions watch extensions
+func (ctrl *ServiceCtrl) WatchExtensions(ctx context.Context, ext string, revision int64) ([]ExtensionEvent, int64, error) {
+	watcher := clientv3.NewWatcher(ctrl.etcdClient)
+	defer watcher.Close()
+
+	key := ctrl.extNotifyPrefix(ext)
+	var watchCh clientv3.WatchChan
+	if revision > 0 {
+		watchCh = watcher.Watch(ctx, key, clientv3.WithRev(revision), clientv3.WithPrefix())
+	} else {
+		watchCh = watcher.Watch(ctx, key, clientv3.WithPrefix())
+	}
+
+	for {
+		resp := <-watchCh
+		if resp.Canceled {
+			return nil, resp.Header.Revision, nil
+		}
+		events := make([]ExtensionEvent, 0, len(resp.Events))
+		for _, event := range resp.Events {
+			if event.IsCreate() {
+				service, zone := ctrl.parseNotifyKey(string(event.Kv.Key))
+				if service != nil {
+					events = append(events, ExtensionEvent{
+						Service: *service,
+						Zone:    *zone,
+					})
+				}
+			}
+		}
+		if len(events) == 0 {
+			continue
+		}
+		return events, resp.Header.Revision, nil
+	}
 }

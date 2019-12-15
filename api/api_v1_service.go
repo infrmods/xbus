@@ -172,3 +172,27 @@ func (server *Server) v1DeleteService(c echo.Context) error {
 	}
 	return JSONOk(c)
 }
+
+type watchExtResult struct {
+	Events   []services.ExtensionEvent `json:"events"`
+	Revision int64                     `json:"revision"`
+}
+
+func (server *Server) v1WatchExt(c echo.Context) error {
+	revision, ok, err := IntQueryParamD(c, "revision", 0)
+	if !ok {
+		return err
+	}
+	timeout, ok, err := IntQueryParamD(c, "timeout", defaultWatchTimeout)
+	if !ok {
+		return err
+	}
+	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancelFunc()
+
+	events, rev, err := server.services.WatchExtensions(ctx, c.ParamValues()[0], revision)
+	if err != nil {
+		return JSONError(c, err)
+	}
+	return JSONResult(c, watchExtResult{Events: events, Revision: rev})
+}

@@ -65,3 +65,21 @@ const serviceKeyNodePrefix = "node_"
 func (ctrl *ServiceCtrl) serviceKey(service, zone, addr string) string {
 	return fmt.Sprintf("%s/%s/%s/node_%s", ctrl.config.KeyPrefix, service, zone, addr)
 }
+
+func (ctrl *ServiceCtrl) extNotifyKey(desc *ServiceDescV1) string {
+	return fmt.Sprintf("%s-ext-notifies/%s/%s/%s", ctrl.config.KeyPrefix, desc.Extension, desc.Service, desc.Zone)
+}
+
+var rNotifyKey = regexp.MustCompile(`-ext-notifies/[^/]+/([^/]+)/([^/]+)$`)
+
+func (ctrl *ServiceCtrl) parseNotifyKey(key string) (*string, *string) {
+	parts := rNotifyKey.FindStringSubmatch(key)
+	if parts != nil {
+		return &parts[1], &parts[2]
+	}
+	return nil, nil
+}
+
+func (ctrl *ServiceCtrl) extNotifyPrefix(ext string) string {
+	return fmt.Sprintf("%s-ext-notifies/%s", ctrl.config.KeyPrefix, ext)
+}
