@@ -11,7 +11,7 @@ import (
 
 // GetErrCode get err code
 func GetErrCode(err error) codes.Code {
-	var code codes.Code = codes.Unknown
+	var code = codes.Unknown
 	if etcdErr, ok := err.(rpctypes.EtcdError); ok {
 		code = etcdErr.Code()
 	} else {

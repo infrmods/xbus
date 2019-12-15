@@ -10,6 +10,7 @@ import (
 var rValidName = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]{5,}$`)
 var rValidService = regexp.MustCompile(`(?i)^[a-z][a-z0-9_.-]{5,}:[a-z0-9][a-z0-9_.-]*$`)
 var rValidZone = regexp.MustCompile(`(?i)^[a-z0-9][a-z0-9_-]{3,}$`)
+var rValidExt = regexp.MustCompile(`(?i)^[a-z0-9][a-z0-9_-]{3,16}$`)
 
 func checkName(name string) error {
 	if !rValidName.MatchString(name) {
@@ -31,6 +32,13 @@ func checkServiceZone(service, zone string) error {
 	}
 	if !rValidZone.MatchString(zone) {
 		return utils.NewError(utils.EcodeInvalidZone, "")
+	}
+	return nil
+}
+
+func checkExtension(ext string) error {
+	if !rValidExt.MatchString(ext) {
+		return utils.Errorf(utils.EcodeInvalidExt, "invalid extension: %v", ext)
 	}
 	return nil
 }

@@ -17,6 +17,8 @@ const (
 	EcodeInvalidService = "INVALID_SERVICE"
 	// EcodeInvalidZone INVALID_ZONE
 	EcodeInvalidZone = "INVALID_ZONE"
+	// EcodeInvalidExt INVALID_EXTENSION
+	EcodeInvalidExt = "INVALID_EXTENSION"
 	// EcodeInvalidValue INVALID_VALUE
 	EcodeInvalidValue = "INVALID_VALUE"
 	// EcodeInvalidVersion INVALID_VERSION

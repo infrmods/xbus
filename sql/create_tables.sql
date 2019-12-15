@@ -178,6 +178,7 @@ CREATE TABLE `services` (
   `service` varchar(240) DEFAULT NULL,
   `zone` varchar(16) NOT NULL DEFAULT 'default',
   `typ` varchar(16) NOT NULL,
+  `extension` varchar(16) NOT NULL,
   `proto` text NOT NULL,
   `description` text NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,

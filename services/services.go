@@ -196,6 +196,9 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 		descKey := ctrl.serviceDescKey(desc.Service, desc.Zone)
 		descPuts := []clientv3.Op{clientv3.OpPut(descKey, descValue)}
 		if desc.Extension != "" {
+			if err := checkExtension(desc.Extension); err != nil {
+				return 0, err
+			}
 			if notifyLeaseID == 0 {
 				resp, err := ctrl.etcdClient.Grant(ctx, ctrl.config.ExtNotifyTTL)
 				if err != nil {
