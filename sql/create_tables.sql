@@ -47,7 +47,7 @@ CREATE TABLE `apps` (
   `status` tinyint(4) NOT NULL,
   `name` varchar(64) NOT NULL,
   `description` varchar(512) NOT NULL,
-  `key` varchar(4096) DEFAULT NULL,
+  `private_key` varchar(4096) DEFAULT NULL,
   `cert` varchar(4096) DEFAULT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -175,15 +175,15 @@ CREATE TABLE `perms` (
 CREATE TABLE `services` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `status` tinyint(4) NOT NULL,
-  `name` varchar(256) NOT NULL,
-  `version` varchar(32) NOT NULL,
+  `service` varchar(240) DEFAULT NULL,
+  `zone` varchar(16) NOT NULL DEFAULT 'default',
   `typ` varchar(16) NOT NULL,
   `proto` text NOT NULL,
   `description` text NOT NULL,
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `modify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `nv_dup` (`name`,`version`)
+  UNIQUE KEY `service_dup` (`service`,`zone`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
