@@ -357,7 +357,7 @@ func (ctrl *ServiceCtrl) WatchExtensions(ctx context.Context, ext string, revisi
 		}
 		events := make([]ExtensionEvent, 0, len(resp.Events))
 		for _, event := range resp.Events {
-			if event.IsCreate() {
+			if event.Type == clientv3.EventTypePut {
 				service, zone := ctrl.parseNotifyKey(string(event.Kv.Key))
 				if service != nil {
 					events = append(events, ExtensionEvent{
