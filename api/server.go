@@ -85,6 +85,9 @@ func (server *Server) prepare() {
 			Format: "method=${method}, uri=${uri}, status=${status}\n",
 		}))
 	}
+	server.e.GET("/api/ok", func(c echo.Context) error {
+		return c.JSON(200, map[string]bool{"ok": true})
+	})
 	server.e.Use(echo.MiddlewareFunc(server.verifyApp))
 	server.registerV1ServiceAPIs(server.e.Group("/api/v1/services"))
 	server.e.GET("/api/v1/service-extensions/:extension", server.v1WatchExt)
