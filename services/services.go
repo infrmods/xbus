@@ -381,26 +381,26 @@ func (ctrl *ServiceCtrl) WatchExtensions(ctx context.Context, ext string, revisi
 			}
 			return nil, 0, nil
 		}
-		events := make([]ExtensionEvent, 0, len(resp.Events))
-		dups := make(map[string]bool)
+		eventMap := make(map[string]ExtensionEvent, 0)
 		for _, event := range resp.Events {
 			if event.Type == clientv3.EventTypePut {
 				service, zone := ctrl.parseNotifyKey(string(event.Kv.Key))
 				if service != nil {
-					dup := fmt.Sprintf("%v/%v", *service, *zone)
-					if _, has := dups[dup]; !has {
-						dups[dup] = true
-						events = append(events, ExtensionEvent{
-							Service: *service,
-							Zone:    *zone,
-							Event:   string(event.Kv.Value),
-						})
+					key := fmt.Sprintf("%v/%v", *service, *zone)
+					eventMap[key] = ExtensionEvent{
+						Service: *service,
+						Zone:    *zone,
+						Event:   string(event.Kv.Value),
 					}
 				}
 			}
 		}
-		if len(events) == 0 {
+		if len(eventMap) == 0 {
 			continue
+		}
+		events := make([]ExtensionEvent, 0, len(eventMap))
+		for _, event := range eventMap {
+			events = append(events, event)
 		}
 		return events, resp.Header.Revision, nil
 	}
