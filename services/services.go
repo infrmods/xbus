@@ -206,7 +206,7 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 				}
 				notifyLeaseID = resp.ID
 			}
-			descPuts = append(descPuts, clientv3.OpPut(ctrl.extNotifyKey(&desc), desc.Extension, clientv3.WithLease(notifyLeaseID)))
+			descPuts = append(descPuts, clientv3.OpPut(ctrl.extNotifyKey(&desc), "plug", clientv3.WithLease(notifyLeaseID)))
 		}
 		updateOps = append(updateOps,
 			clientv3.OpTxn(
@@ -317,9 +317,34 @@ func (ctrl *ServiceCtrl) Delete(ctx context.Context, serviceKey string, zone str
 			}
 		}
 		if len(resp.Kvs) > 0 {
-			_, err := ctrl.etcdClient.Delete(ctx, entryPrefix, clientv3.WithPrefix())
+			resp, err := ctrl.etcdClient.Delete(ctx, entryPrefix, clientv3.WithPrefix(), clientv3.WithPrevKV())
 			if err != nil {
 				return utils.CleanErr(err, "delete service keys fail", "delete service keys(%s) fail: %v", entryPrefix, err)
+			}
+			var notifyLeaseID clientv3.LeaseID
+			opPuts := make([]clientv3.Op, 0)
+			for _, kv := range resp.PrevKvs {
+				glog.Infof("deleted %s", string(kv.Key))
+				if ctrl.isServiceDescKey(string(kv.Key)) {
+					var desc ServiceDescV1
+					if err := json.Unmarshal(kv.Value, &desc); err == nil {
+						if desc.Extension != "" {
+							if notifyLeaseID == 0 {
+								resp, err := ctrl.etcdClient.Grant(ctx, ctrl.config.ExtNotifyTTL)
+								if err != nil {
+									glog.Errorf("create ext notify lease fail: %v", err)
+								}
+								notifyLeaseID = resp.ID
+							}
+							opPuts = append(opPuts, clientv3.OpPut(ctrl.extNotifyKey(&desc), "delete", clientv3.WithLease(notifyLeaseID)))
+						}
+					}
+				}
+			}
+			if len(opPuts) > 0 {
+				if _, err := ctrl.etcdClient.Txn(ctx).Then(opPuts...).Commit(); err != nil {
+					glog.Errorf("ext notify puts fail: %v", err)
+				}
 			}
 		}
 	} else {
@@ -332,6 +357,7 @@ func (ctrl *ServiceCtrl) Delete(ctx context.Context, serviceKey string, zone str
 type ExtensionEvent struct {
 	Service string `json:"service"`
 	Zone    string `json:"zone"`
+	Event   string `json:"event"`
 }
 
 // WatchExtensions watch extensions
@@ -367,6 +393,7 @@ func (ctrl *ServiceCtrl) WatchExtensions(ctx context.Context, ext string, revisi
 						events = append(events, ExtensionEvent{
 							Service: *service,
 							Zone:    *zone,
+							Event:   string(event.Kv.Value),
 						})
 					}
 				}

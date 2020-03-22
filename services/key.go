@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/infrmods/xbus/utils"
 )
@@ -66,6 +67,10 @@ const serviceDescNodeKey = "desc"
 
 func (ctrl *ServiceCtrl) serviceDescKey(service, zone string) string {
 	return fmt.Sprintf("%s/%s/%s/desc", ctrl.config.KeyPrefix, service, zone)
+}
+
+func (ctrl *ServiceCtrl) isServiceDescKey(key string) bool {
+	return strings.HasSuffix(key, "/"+serviceDescNodeKey)
 }
 
 const serviceKeyNodePrefix = "node_"
