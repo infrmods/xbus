@@ -90,7 +90,7 @@ func (server *Server) prepare() {
 	})
 	server.e.Use(echo.MiddlewareFunc(server.verifyApp))
 	server.registerV1ServiceAPIs(server.e.Group("/api/v1/services"))
-	server.e.GET("/api/v1/service-extensions/:extension", server.v1WatchExt)
+	server.e.GET("/api/v1/service-descs", server.v1WatchServiceDesc)
 	server.registerConfigAPIs(server.e.Group("/api/configs"))
 	server.registerAppAPIs(server.e.Group("/api/apps"))
 	server.registerLeaseAPIs(server.e.Group("/api/leases"))

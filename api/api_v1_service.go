@@ -70,12 +70,18 @@ func (server *Server) v1PlugAllService(c echo.Context) error {
 		return err
 	}
 
-	var desces []services.ServiceDescV1
-	if ok, err := JSONFormParam(c, "desces", &desces); !ok {
-		return err
+	var descs []services.ServiceDescV1
+	if c.FormValue("descs") != "" {
+		if ok, err := JSONFormParam(c, "descs", &descs); !ok {
+			return err
+		}
+	} else {
+		if ok, err := JSONFormParam(c, "desces", &descs); !ok {
+			return err
+		}
 	}
 	notPermitted := make([]string, 0)
-	for _, desc := range desces {
+	for _, desc := range descs {
 		if ok, err := server.checkPerm(c, apps.PermTypeService, true, desc.Service); err == nil {
 			if !ok {
 				notPermitted = append(notPermitted, desc.Service)
@@ -98,7 +104,7 @@ func (server *Server) v1PlugAllService(c echo.Context) error {
 
 	newLeaseID, err := server.services.PlugAll(context.Background(),
 		time.Duration(ttl)*time.Second, clientv3.LeaseID(leaseID),
-		desces, &endpoint)
+		descs, &endpoint)
 	if err != nil {
 		return JSONError(c, err)
 	}
@@ -173,26 +179,15 @@ func (server *Server) v1DeleteService(c echo.Context) error {
 	return JSONOk(c)
 }
 
-type watchExtResult struct {
-	Events   []services.ExtensionEvent `json:"events"`
-	Revision int64                     `json:"revision"`
-}
-
-func (server *Server) v1WatchExt(c echo.Context) error {
+func (server *Server) v1WatchServiceDesc(c echo.Context) error {
+	zone := c.QueryParam("zone")
 	revision, ok, err := IntQueryParamD(c, "revision", 0)
 	if !ok {
 		return err
 	}
-	timeout, ok, err := IntQueryParamD(c, "timeout", defaultWatchTimeout)
-	if !ok {
-		return err
-	}
-	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
-	defer cancelFunc()
-
-	events, rev, err := server.services.WatchExtensions(ctx, c.ParamValues()[0], revision)
+	result, err := server.services.WatchServiceDesc(context.Background(), zone, revision)
 	if err != nil {
 		return JSONError(c, err)
 	}
-	return JSONResult(c, watchExtResult{Events: events, Revision: rev})
+	return JSONResult(c, result)
 }

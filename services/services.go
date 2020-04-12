@@ -163,11 +163,11 @@ func checkDesc(desc *ServiceDescV1) error {
 // PlugAll plug services
 func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 	ttl time.Duration, leaseID clientv3.LeaseID,
-	desces []ServiceDescV1, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
+	descs []ServiceDescV1, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
 	if err := ctrl.checkAddress(endpoint.Address); err != nil {
 		return 0, err
 	}
-	for _, desc := range desces {
+	for _, desc := range descs {
 		if err := checkDesc(&desc); err != nil {
 			return 0, err
 		}
@@ -185,37 +185,25 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 		}
 	}
 
-	var notifyLeaseID clientv3.LeaseID
-	updateOps := make([]clientv3.Op, 0, len(desces)*2)
-	for _, desc := range desces {
+	updateOps := make([]clientv3.Op, 0, len(descs)*2)
+	for _, desc := range descs {
 		descData, err := desc.Marshal()
 		if err != nil {
 			return 0, err
 		}
 		descValue := string(descData)
 		descKey := ctrl.serviceDescKey(desc.Service, desc.Zone)
-		descPuts := []clientv3.Op{clientv3.OpPut(descKey, descValue)}
-		if desc.Extension != "" {
-			if err := checkExtension(desc.Extension); err != nil {
-				return 0, err
-			}
-			if notifyLeaseID == 0 {
-				resp, err := ctrl.etcdClient.Grant(ctx, ctrl.config.ExtNotifyTTL)
-				if err != nil {
-					return 0, utils.CleanErr(err, "create notify lease fail", "create ext notify lease fail: %v", err)
-				}
-				notifyLeaseID = resp.ID
-			}
-			descPuts = append(descPuts, clientv3.OpPut(ctrl.extNotifyKey(&desc), "plug", clientv3.WithLease(notifyLeaseID)))
-		}
 		updateOps = append(updateOps,
 			clientv3.OpTxn(
 				[]clientv3.Cmp{clientv3.Compare(clientv3.Value(descKey), "=", descValue)},
 				nil,
-				descPuts,
+				[]clientv3.Op{
+					clientv3.OpPut(descKey, descValue),
+					clientv3.OpPut(ctrl.serviceDescNotifyKey(desc.Service, desc.Zone), descValue),
+				},
 			))
 
-		nodeKey := ctrl.serviceKey(desc.Service, desc.Zone, endpoint.Address)
+		nodeKey := ctrl.serviceNodeKey(desc.Service, desc.Zone, endpoint.Address)
 		var opPut clientv3.Op
 		if leaseID > 0 {
 			opPut = clientv3.OpPut(nodeKey, endpointValue, clientv3.WithLease(leaseID))
@@ -237,7 +225,7 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 			"put services node fail: %v", err)
 	}
 
-	if err := ctrl.updateServiceDBItems(desces); err != nil {
+	if err := ctrl.updateServiceDBItems(descs); err != nil {
 		glog.Errorf("update service db items fail: %v", err)
 		return 0, utils.NewError(utils.EcodeSystemError, "update db fail")
 	}
@@ -252,8 +240,8 @@ func (ctrl *ServiceCtrl) Unplug(ctx context.Context, service, zone, addr string)
 	if err := ctrl.checkAddress(addr); err != nil {
 		return err
 	}
-	if _, err := ctrl.etcdClient.Delete(ctx, ctrl.serviceKey(service, zone, addr)); err != nil {
-		glog.Errorf("delete key(%s) fail: %v", ctrl.serviceKey(service, zone, addr), err)
+	if _, err := ctrl.etcdClient.Delete(ctx, ctrl.serviceNodeKey(service, zone, addr)); err != nil {
+		glog.Errorf("delete key(%s) fail: %v", ctrl.serviceNodeKey(service, zone, addr), err)
 		return utils.NewSystemError("delete key fail")
 	}
 	return nil
@@ -304,6 +292,61 @@ func (ctrl *ServiceCtrl) Watch(ctx context.Context, clientIP net.IP, serviceKey 
 	return ctrl._query(ctx, clientIP, serviceKey)
 }
 
+// ServiceDescEvent desc event
+type ServiceDescEvent struct {
+	EventType string        `json:"event_type"`
+	Service   ServiceDescV1 `json:"service"`
+}
+
+// ServiceDescWatchResult desc watch result
+type ServiceDescWatchResult struct {
+	Events   []ServiceDescEvent `json:"events"`
+	Revision int64              `json:"revision"`
+}
+
+// WatchServiceDesc watch service desc
+func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revision int64) (*ServiceDescWatchResult, error) {
+	prefix := ctrl.serviceDescNotifyKeyPrefix(zone)
+	watcher := clientv3.NewWatcher(ctrl.etcdClient)
+	defer watcher.Close()
+
+	var watchCh clientv3.WatchChan
+	if revision > 0 {
+		watchCh = watcher.Watch(ctx, prefix, clientv3.WithRev(revision), clientv3.WithPrefix())
+	} else {
+		watchCh = watcher.Watch(ctx, prefix, clientv3.WithPrefix())
+	}
+
+	for {
+		resp := <-watchCh
+		if resp.Err() != nil {
+			return nil, utils.CleanErr(resp.Err(), "watch service desc fail", "watch service desc(zone:%s) fail: %v", zone, resp.Err())
+		}
+
+		events := make([]ServiceDescEvent, 1)
+		for _, event := range resp.Events {
+			var eventType string
+			if event.Type == clientv3.EventTypePut {
+				eventType = "put"
+			} else if event.Type == clientv3.EventTypeDelete {
+				eventType = "delete"
+			} else {
+				continue
+			}
+			var serviceDesc ServiceDescV1
+			if err := json.Unmarshal(event.Kv.Value, &serviceDesc); err != nil {
+				glog.Errorf("unmarshal service desc(key: %s) fail: %v", string(event.Kv.Key), err)
+				continue
+			}
+
+			events = append(events, ServiceDescEvent{EventType: eventType, Service: serviceDesc})
+		}
+		if len(events) > 0 {
+			return &ServiceDescWatchResult{Events: events, Revision: resp.Header.Revision}, nil
+		}
+	}
+}
+
 // Delete delete service
 func (ctrl *ServiceCtrl) Delete(ctx context.Context, serviceKey string, zone string) error {
 	entryPrefix := ctrl.serviceEntryPrefix(serviceKey)
@@ -317,91 +360,16 @@ func (ctrl *ServiceCtrl) Delete(ctx context.Context, serviceKey string, zone str
 			}
 		}
 		if len(resp.Kvs) > 0 {
-			resp, err := ctrl.etcdClient.Delete(ctx, entryPrefix, clientv3.WithPrefix(), clientv3.WithPrevKV())
+			_, err := ctrl.etcdClient.Txn(ctx).Then([]clientv3.Op{
+				clientv3.OpDelete(ctrl.serviceDescKey(serviceKey, zone)),
+				clientv3.OpDelete(ctrl.serviceDescNotifyKey(serviceKey, zone)),
+			}...).Commit()
 			if err != nil {
 				return utils.CleanErr(err, "delete service keys fail", "delete service keys(%s) fail: %v", entryPrefix, err)
-			}
-			var notifyLeaseID clientv3.LeaseID
-			opPuts := make([]clientv3.Op, 0)
-			for _, kv := range resp.PrevKvs {
-				glog.Infof("deleted %s", string(kv.Key))
-				if ctrl.isServiceDescKey(string(kv.Key)) {
-					var desc ServiceDescV1
-					if err := json.Unmarshal(kv.Value, &desc); err == nil {
-						if desc.Extension != "" {
-							if notifyLeaseID == 0 {
-								resp, err := ctrl.etcdClient.Grant(ctx, ctrl.config.ExtNotifyTTL)
-								if err != nil {
-									glog.Errorf("create ext notify lease fail: %v", err)
-								}
-								notifyLeaseID = resp.ID
-							}
-							opPuts = append(opPuts, clientv3.OpPut(ctrl.extNotifyKey(&desc), "delete", clientv3.WithLease(notifyLeaseID)))
-						}
-					}
-				}
-			}
-			if len(opPuts) > 0 {
-				if _, err := ctrl.etcdClient.Txn(ctx).Then(opPuts...).Commit(); err != nil {
-					glog.Errorf("ext notify puts fail: %v", err)
-				}
 			}
 		}
 	} else {
 		return utils.CleanErr(err, "get service keys fail", "precheck delete(%s) fail: %v", entryPrefix, err)
 	}
 	return ctrl.deleteServiceDBItems(serviceKey, zone)
-}
-
-// ExtensionEvent extension event
-type ExtensionEvent struct {
-	Service string `json:"service"`
-	Zone    string `json:"zone"`
-	Event   string `json:"event"`
-}
-
-// WatchExtensions watch extensions
-func (ctrl *ServiceCtrl) WatchExtensions(ctx context.Context, ext string, revision int64) ([]ExtensionEvent, int64, error) {
-	watcher := clientv3.NewWatcher(ctrl.etcdClient)
-	defer watcher.Close()
-
-	key := ctrl.extNotifyPrefix(ext)
-	var watchCh clientv3.WatchChan
-	if revision > 0 {
-		watchCh = watcher.Watch(ctx, key, clientv3.WithRev(revision), clientv3.WithPrefix())
-	} else {
-		watchCh = watcher.Watch(ctx, key, clientv3.WithPrefix())
-	}
-
-	for {
-		resp := <-watchCh
-		if resp.Events == nil {
-			if err := resp.Err(); err != nil {
-				glog.Errorf("watch service extensions fail: %v", err)
-			}
-			return nil, 0, nil
-		}
-		eventMap := make(map[string]ExtensionEvent, 0)
-		for _, event := range resp.Events {
-			if event.Type == clientv3.EventTypePut {
-				service, zone := ctrl.parseNotifyKey(string(event.Kv.Key))
-				if service != nil {
-					key := fmt.Sprintf("%v/%v", *service, *zone)
-					eventMap[key] = ExtensionEvent{
-						Service: *service,
-						Zone:    *zone,
-						Event:   string(event.Kv.Value),
-					}
-				}
-			}
-		}
-		if len(eventMap) == 0 {
-			continue
-		}
-		events := make([]ExtensionEvent, 0, len(eventMap))
-		for _, event := range eventMap {
-			events = append(events, event)
-		}
-		return events, resp.Header.Revision, nil
-	}
 }
