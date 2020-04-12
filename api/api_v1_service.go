@@ -185,7 +185,14 @@ func (server *Server) v1WatchServiceDesc(c echo.Context) error {
 	if !ok {
 		return err
 	}
-	result, err := server.services.WatchServiceDesc(context.Background(), zone, revision)
+	timeout, ok, err := IntQueryParamD(c, "timeout", defaultWatchTimeout)
+	if !ok {
+		return err
+	}
+	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancelFunc()
+
+	result, err := server.services.WatchServiceDesc(ctx, zone, revision)
 	if err != nil {
 		return JSONError(c, err)
 	}
