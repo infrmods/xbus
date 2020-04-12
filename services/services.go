@@ -323,7 +323,7 @@ func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revi
 			return nil, utils.CleanErr(resp.Err(), "watch service desc fail", "watch service desc(zone:%s) fail: %v", zone, resp.Err())
 		}
 
-		events := make([]ServiceDescEvent, 1)
+		events := make([]ServiceDescEvent, 0, 8)
 		for _, event := range resp.Events {
 			var eventType string
 			if event.Type == clientv3.EventTypePut {
