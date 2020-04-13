@@ -316,7 +316,10 @@ func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revi
 	}
 
 	for {
-		resp := <-watchCh
+		resp, ok := <-watchCh
+		if !ok {
+			return nil, nil
+		}
 		if resp.Err() != nil {
 			return nil, utils.CleanErr(resp.Err(), "watch service desc fail", "watch service desc(zone:%s) fail: %v", zone, resp.Err())
 		}
