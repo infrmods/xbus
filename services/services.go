@@ -23,7 +23,6 @@ type ServiceDescV1 struct {
 	Service     string `json:"service"`
 	Zone        string `json:"zone,omitempty"`
 	Type        string `json:"type"`
-	Extension   string `json:"extension,omitempty"`
 	Proto       string `json:"proto,omitempty"`
 	Description string `json:"description,omitempty"`
 }
@@ -78,7 +77,6 @@ type NetMapping struct {
 type Config struct {
 	KeyPrefix               string       `default:"/services" yaml:"key_prefix"`
 	NetMappings             []NetMapping `yaml:"net_mappings"`
-	ExtNotifyTTL            int64        `default:"86400" yaml:"extension_nofiy_tty"`
 	BannedEndpointAddresses []string     `yaml:"banned_endpoint_addresses"`
 	bannedAddrRs            []*regexp.Regexp
 }

@@ -37,13 +37,6 @@ func checkServiceZone(service, zone string) error {
 	return nil
 }
 
-func checkExtension(ext string) error {
-	if !rValidExt.MatchString(ext) {
-		return utils.Errorf(utils.EcodeInvalidExt, "invalid extension: %v", ext)
-	}
-	return nil
-}
-
 var rValidAddress = regexp.MustCompile(`(?i)^[a-z0-9:_.-]+$`)
 
 func (ctrl *ServiceCtrl) checkAddress(addr string) error {

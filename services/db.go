@@ -22,7 +22,6 @@ type DBServiceItemV1 struct {
 	Service     string    `json:"service"`
 	Zone        string    `json:"zone"`
 	Type        string    `json:"type"`
-	Extension   string    `json:"extension"`
 	Proto       string    `json:"proto"`
 	Description string    `json:"description"`
 	CreateTime  time.Time `json:"create_time"`
@@ -33,11 +32,11 @@ func (ctrl *ServiceCtrl) updateServiceDBItems(services []ServiceDescV1) error {
 	sqlValues := make([]string, 0, len(services))
 	values := make([]interface{}, 0, len(services)*7)
 	for _, service := range services {
-		sqlValues = append(sqlValues, "(?,?,?,?,?,?,?)")
-		values = append(values, serviceStatusOk, service.Service, service.Zone, service.Type, service.Extension, service.Proto, service.Description)
+		sqlValues = append(sqlValues, "(?,?,?,?,?,?)")
+		values = append(values, serviceStatusOk, service.Service, service.Zone, service.Type, service.Proto, service.Description)
 	}
-	sql := fmt.Sprintf(`insert into services(status, service, zone, typ, extension, proto, description) values %s 
-						on duplicate key update status=values(status), typ=values(typ), extension=values(extension),
+	sql := fmt.Sprintf(`insert into services(status, service, zone, typ, proto, description) values %s 
+						on duplicate key update status=values(status), typ=values(typ),
 						proto=values(proto), description=values(description)`,
 		strings.Join(sqlValues, ","))
 	_, err := ctrl.db.Exec(sql, values...)
@@ -49,7 +48,6 @@ type ServiceItemV1 struct {
 	Service   string `json:"service"`
 	Zone      string `json:"zone"`
 	Type      string `json:"type"`
-	Extension string `json:"extension,omitempty"`
 }
 
 // SearchResultV1 search result
@@ -69,17 +67,17 @@ func (ctrl *ServiceCtrl) SearchService(service string, skip int64, limit int64) 
 
 	result := SearchResultV1{Services: make([]ServiceItemV1, 0, limit), Total: total}
 	if total > skip {
-		if rows, err := ctrl.db.Query(`select service, zone, typ, extension from services where status=? and service like ?
+		if rows, err := ctrl.db.Query(`select service, zone, typ from services where status=? and service like ?
 				order by modify_time desc limit ?,?`, serviceStatusOk, like, skip, limit); err == nil {
 			defer rows.Close()
 			for rows.Next() {
-				var service, zone, typ, ext string
-				if err := rows.Scan(&service, &zone, &typ, &ext); err != nil {
+				var service, zone, typ string
+				if err := rows.Scan(&service, &zone, &typ); err != nil {
 					glog.Errorf("query db services(%s) fail: %v", service, err)
 					return nil, utils.NewError(utils.EcodeSystemError, "query db services fail")
 				}
 				result.Services = append(result.Services,
-					ServiceItemV1{Service: service, Zone: zone, Type: typ, Extension: ext})
+					ServiceItemV1{Service: service, Zone: zone, Type: typ})
 			}
 		} else {
 			glog.Errorf("query db services(%s) fail: %v", service, err)
