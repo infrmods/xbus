@@ -82,3 +82,19 @@ func (ctrl *ServiceCtrl) serviceDescNotifyKeyPrefix(zone string) string {
 	}
 	return fmt.Sprintf("%s-descs/", ctrl.config.KeyPrefix)
 }
+
+type serviceDescKey struct {
+	service string
+	zone    string
+}
+
+func (ctrl *ServiceCtrl) splitServiceDescNotifyKey(key string) *serviceDescKey {
+	prefix := ctrl.config.KeyPrefix + "-descs/"
+	if strings.HasPrefix(key, prefix) {
+		parts := strings.Split(key[len(prefix):], "/")
+		if len(parts) == 2 {
+			return &serviceDescKey{zone: parts[0], service: parts[1]}
+		}
+	}
+	return nil
+}

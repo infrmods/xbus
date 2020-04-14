@@ -22,7 +22,7 @@ const DefaultZone = "default"
 type ServiceDescV1 struct {
 	Service     string `json:"service"`
 	Zone        string `json:"zone,omitempty"`
-	Type        string `json:"type"`
+	Type        string `json:"type,omitempty"`
 	Proto       string `json:"proto,omitempty"`
 	Description string `json:"description,omitempty"`
 }
@@ -327,16 +327,24 @@ func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revi
 		events := make([]ServiceDescEvent, 0, 8)
 		for _, event := range resp.Events {
 			var eventType string
+			var serviceDesc ServiceDescV1
+
 			if event.Type == clientv3.EventTypePut {
 				eventType = "put"
+				if err := json.Unmarshal(event.Kv.Value, &serviceDesc); err != nil {
+					glog.Errorf("unmarshal service desc(key: %s) fail: %v", string(event.Kv.Key), err)
+					continue
+				}
 			} else if event.Type == clientv3.EventTypeDelete {
 				eventType = "delete"
+				key := ctrl.splitServiceDescNotifyKey(string(event.Kv.Key))
+				if key == nil {
+					glog.Warning("invalid service-desc key: %s", string(event.Kv.Key))
+					continue
+				}
+				serviceDesc.Service = key.service
+				serviceDesc.Zone = key.zone
 			} else {
-				continue
-			}
-			var serviceDesc ServiceDescV1
-			if err := json.Unmarshal(event.Kv.Value, &serviceDesc); err != nil {
-				glog.Errorf("unmarshal service desc(key: %s) fail: %v", string(event.Kv.Key), err)
 				continue
 			}
 
