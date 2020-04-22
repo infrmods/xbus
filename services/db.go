@@ -29,6 +29,10 @@ type DBServiceItemV1 struct {
 }
 
 func (ctrl *ServiceCtrl) updateServiceDBItems(services []ServiceDescV1) error {
+	if len(services) == 0 {
+		return nil
+	}
+
 	sqlValues := make([]string, 0, len(services))
 	values := make([]interface{}, 0, len(services)*7)
 	for _, service := range services {
@@ -45,9 +49,9 @@ func (ctrl *ServiceCtrl) updateServiceDBItems(services []ServiceDescV1) error {
 
 // ServiceItemV1 service item v1
 type ServiceItemV1 struct {
-	Service   string `json:"service"`
-	Zone      string `json:"zone"`
-	Type      string `json:"type"`
+	Service string `json:"service"`
+	Zone    string `json:"zone"`
+	Type    string `json:"type"`
 }
 
 // SearchResultV1 search result
