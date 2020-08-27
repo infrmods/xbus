@@ -4,7 +4,8 @@
 
 - 启动 mysql 和 etcd
     - 使用 sql 目录下的 `create_tables.sql` 建表
-- 编译
+    - 冷启动数据去 qa 摸，或者开 ops-center 从头来点
+- 编译 `go build`
 - 运行 `./xbus gen-root` 生成 `rootcert.pem` 和 `rootkey.pem`
 - 配置 `config.yaml`
     - 进入 qa 集群的 xbus pod，查看 `config.yaml`

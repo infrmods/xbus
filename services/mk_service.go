@@ -13,6 +13,27 @@ import (
 
 var rServiceSplit = regexp.MustCompile(`/(.+)/(.+)/(.+)$`)
 
+func (ctrl *ServiceCtrl) makeServiceWithRawZone(serviceKey string, kvs []*mvccpb.KeyValue) ([]string, error) {
+	zonesMap := make(map[string]bool)
+	for _, kv := range kvs {
+		matches := rServiceSplit.FindAllStringSubmatch(string(kv.Key), -1)
+		if len(matches) != 1 {
+			glog.Warningf("got unexpected service node: %s", string(kv.Key))
+			continue
+		}
+
+		zone := matches[0][2]
+		zonesMap[zone] = true
+	}
+
+	zones := []string{}
+	for k := range zonesMap {
+		zones = append(zones, k)
+	}
+
+	return zones, nil
+}
+
 func (ctrl *ServiceCtrl) makeService(clientIP net.IP, serviceKey string, kvs []*mvccpb.KeyValue) (*ServiceV1, error) {
 	zones := make(map[string]*ServiceZoneV1)
 
