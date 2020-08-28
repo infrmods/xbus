@@ -281,8 +281,11 @@ func (server *Server) registerV1ServiceAPIs(g *echo.Group) {
 
 	if server.config.PermitPublicServiceQuery {
 		g.GET("/:service", echo.HandlerFunc(server.v1QueryService))
+		g.GET("/:service/:zone", echo.HandlerFunc(server.v1QueryServiceZone))
 	} else {
 		g.GET("/:service", echo.HandlerFunc(server.v1QueryService),
+			server.newPermChecker(apps.PermTypeService, false))
+		g.GET("/:service/:zone", echo.HandlerFunc(server.v1QueryServiceZone),
 			server.newPermChecker(apps.PermTypeService, false))
 	}
 }

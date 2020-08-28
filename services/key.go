@@ -56,6 +56,10 @@ func (ctrl *ServiceCtrl) serviceEntryPrefix(name string) string {
 	return fmt.Sprintf("%s/%s/", ctrl.config.KeyPrefix, name)
 }
 
+func (ctrl *ServiceCtrl) serviceZoneKey(service string, zone string) string {
+	return fmt.Sprintf("%s/%s", service, zone)
+}
+
 const serviceDescNodeKey = "desc"
 
 func (ctrl *ServiceCtrl) serviceDescKey(service, zone string) string {

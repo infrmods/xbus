@@ -141,11 +141,38 @@ type serviceQueryResultV1 struct {
 	Revision int64               `json:"revision"`
 }
 
+type serviceQueryRawZoneResultV1 struct {
+	Service  *services.ServiceWithRawZone `json:"service"`
+	Revision int64                        `json:"revision"`
+}
+
 func (server *Server) v1QueryService(c echo.Context) error {
 	if c.QueryParam("watch") == "true" {
 		return server.v1WatchService(c)
 	}
+
+	if c.QueryParam("only_zone") == "true" {
+		service, rev, err := server.services.QueryZones(context.Background(), server.getRemoteIP(c), c.ParamValues()[0])
+		if err != nil {
+			return JSONError(c, err)
+		}
+		return JSONResult(c, serviceQueryRawZoneResultV1{Service: service, Revision: rev})
+	}
+
 	service, rev, err := server.services.Query(context.Background(), server.getRemoteIP(c), c.ParamValues()[0])
+	if err != nil {
+		return JSONError(c, err)
+	}
+	return JSONResult(c, serviceQueryResultV1{Service: service, Revision: rev})
+}
+
+func (server *Server) v1QueryServiceZone(c echo.Context) error {
+	service, rev, err := server.services.QueryServiceZone(
+		context.Background(),
+		server.getRemoteIP(c),
+		c.ParamValues()[0],
+		c.ParamValues()[1],
+	)
 	if err != nil {
 		return JSONError(c, err)
 	}

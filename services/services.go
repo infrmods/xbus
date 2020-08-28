@@ -66,6 +66,12 @@ type ServiceV1 struct {
 	Zones   map[string]*ServiceZoneV1 `json:"zones"`
 }
 
+// ServiceWithRawZone service with raw zone
+type ServiceWithRawZone struct {
+	Service string   `json:"service"`
+	Zones   []string `json:"zones"`
+}
+
 // NetMapping net mapping
 type NetMapping struct {
 	SrcNet string `yaml:"src_net"`
@@ -250,7 +256,39 @@ func (ctrl *ServiceCtrl) Query(ctx context.Context, clientIP net.IP, service str
 	if err := checkService(service); err != nil {
 		return nil, 0, err
 	}
+
 	return ctrl._query(ctx, clientIP, service)
+}
+
+// QueryZones query services with raw zone
+func (ctrl *ServiceCtrl) QueryZones(ctx context.Context, clientIP net.IP, service string) (*ServiceWithRawZone, int64, error) {
+	if err := checkService(service); err != nil {
+		return nil, 0, err
+	}
+
+	serviceKey := ctrl.serviceEntryPrefix(service)
+	resp, err := ctrl.etcdClient.Get(ctx, serviceKey, clientv3.WithPrefix(), clientv3.WithKeysOnly())
+
+	if err != nil {
+		return nil, 0, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", service, err)
+	}
+
+	if len(resp.Kvs) == 0 {
+		return nil, 0, utils.Errorf(utils.EcodeNotFound, "no such service: %s", service)
+	}
+
+	zones, err := ctrl.makeServiceWithRawZone(serviceKey, resp.Kvs)
+
+	return &ServiceWithRawZone{
+		Service: service,
+		Zones:   zones,
+	}, resp.Header.Revision, nil
+}
+
+// QueryServiceZone query service zone with service key and zone
+func (ctrl *ServiceCtrl) QueryServiceZone(ctx context.Context, clientIP net.IP, service string, zone string) (*ServiceV1, int64, error) {
+	key := ctrl.serviceZoneKey(service, zone)
+	return ctrl._query(ctx, clientIP, key) // key 为 `service/zone`
 }
 
 func (ctrl *ServiceCtrl) _query(ctx context.Context, clientIP net.IP, serviceKey string) (*ServiceV1, int64, error) {
