@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/coreos/etcd/clientv3"
+	v3rpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/golang/glog"
 	"github.com/infrmods/xbus/utils"
@@ -179,6 +180,11 @@ func (ctrl *ConfigCtrl) Watch(ctx context.Context, appID int64, node, name strin
 	}
 	resp := <-watchCh
 	if err := resp.Err(); err != nil {
+		// if revision is compacted, return latest revision
+		if err == v3rpc.ErrCompacted {
+			glog.Warningf("key [%s] with revision [%d] is compacted, call get instead", key, revision)
+			return ctrl.Get(ctx, appID, node, name)
+		}
 		return nil, 0, utils.CleanErr(err, "", "watch key(%s) with revision(%d) fail: %v", name, revision, err)
 	}
 	if resp.Canceled || resp.Events == nil {
