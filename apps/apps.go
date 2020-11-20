@@ -337,7 +337,7 @@ func (ctrl *AppCtrl) PlugAppNode(ctx context.Context, appName string, node *AppN
 	if _, err := ctrl.etcdClient.Txn(ctx).If(
 		clientv3.Compare(clientv3.Value(holdKey), "=", holdValue)).Else(
 		clientv3.OpPut(holdKey, holdValue)).Commit(); err != nil {
-		return false, utils.CleanErr(err, "put app holdKey fail", "put app holdKey faial: %v", err)
+		return false, utils.CleanErr(err, "put app holdKey fail", "put app holdKey fail: %v", err)
 	}
 
 	onlineKey := ctrl.nodeOnlineKey(appName, label, node.Key)
