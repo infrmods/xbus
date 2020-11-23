@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"strings"
 
+	"fmt"
+
 	"github.com/coreos/etcd/clientv3"
 	v3rpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/coreos/etcd/mvcc/mvccpb"
@@ -188,7 +190,7 @@ func (ctrl *ConfigCtrl) Watch(ctx context.Context, appID int64, node, name strin
 		return nil, 0, utils.CleanErr(err, "", "watch key(%s) with revision(%d) fail: %v", name, revision, err)
 	}
 	if resp.Canceled || resp.Events == nil {
-		return nil, resp.Header.Revision, nil
+		return nil, resp.Header.Revision, utils.NewError(utils.EcodeEtcdWatchFailed, fmt.Sprintf("watch key(%s) fail, no events", name))
 	}
 	for _, event := range resp.Events {
 		switch event.Type {
