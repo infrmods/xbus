@@ -22,6 +22,8 @@ import (
 
 var serialConfigItem = "cert_serial"
 
+var appServicesPrefix = "/services/"
+
 type dbSerialGenerator struct {
 	db *sql.DB
 }
@@ -86,6 +88,12 @@ type AppCtrl struct {
 	db           *sql.DB
 	CertsManager *CertsCtrl
 	etcdClient   *clientv3.Client
+}
+
+// AppIpsDesc IPs Desc
+type AppIpsDesc struct {
+	App string   `json:"app"`
+	Ips []string `json:"ips"`
 }
 
 // NewAppCtrl new app ctrl
@@ -417,4 +425,40 @@ func (ctrl *AppCtrl) IsAppNodeOnline(ctx context.Context, name, label, key strin
 		return false, err
 	}
 	return len(resp.Kvs) > 0, nil
+}
+
+// UnplugWithApp unplug service with App
+func (ctrl *AppCtrl) UnplugWithApp(ctx context.Context, app string, addrs []string) error {
+	err := ctrl._deleteWithApp(ctx, addrs, app)
+	return err
+}
+
+func (ctrl *AppCtrl) _deleteWithApp(ctx context.Context, clientIPs []string, app string) error {
+	key := appServicesPrefix
+	opts := []clientv3.OpOption{}
+	opts = append(opts, clientv3.WithPrefix())
+	opts = append(opts, clientv3.WithKeysOnly())
+	resp, err := ctrl.etcdClient.Get(ctx, key, opts...)
+	if err != nil {
+		return utils.CleanErr(err, "query fail", "Query(%s) fail: %v", key, err)
+	}
+
+	if len(resp.Kvs) == 0 {
+		return utils.Errorf(utils.EcodeNotFound, "app with no service: %s", app)
+	}
+	kvs := resp.Kvs
+	for _, kv := range kvs {
+		keyStr := string(kv.Key)
+		for _, ip := range clientIPs {
+			if strings.Index(keyStr, ip) != -1 {
+				_, err := ctrl.etcdClient.Delete(ctx, keyStr)
+				if err != nil {
+					//TODO
+					glog.Errorf("delete ip: %s with keystr: %s failed", ip, keyStr)
+					continue
+				}
+			}
+		}
+	}
+	return nil
 }

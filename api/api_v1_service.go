@@ -120,6 +120,31 @@ func (server *Server) v1UnplugService(c echo.Context) error {
 	return JSONOk(c)
 }
 
+//aware is a expensive action
+func (server *Server) v1UnplugServiceWithApp(c echo.Context) error {
+	var descs []apps.AppIpsDesc
+	if c.FormValue("descs") != "" {
+		if ok, err := JSONFormParam(c, "descs", &descs); !ok {
+			return err
+		}
+	} else {
+		if ok, err := JSONFormParam(c, "desces", &descs); !ok {
+			return err
+		}
+	}
+	if descs == nil || len(descs) == 0 {
+		return JSONError(c, utils.NewError(utils.EcodeMissingParam, "must have descs or desces"))
+	}
+
+	for _, v := range descs {
+		err := server.apps.UnplugWithApp(context.Background(), v.App, v.Ips)
+		if err != nil {
+			return JSONError(c, err)
+		}
+	}
+	return JSONOk(c)
+}
+
 func (server *Server) v1SearchService(c echo.Context) error {
 	skip, ok, err := IntQueryParamD(c, "skip", 0)
 	if !ok {
