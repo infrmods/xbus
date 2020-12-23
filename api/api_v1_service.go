@@ -137,6 +137,9 @@ func (server *Server) v1UnplugServiceWithApp(c echo.Context) error {
 	}
 
 	for _, v := range descs {
+		if v.App == "" {
+			return utils.NewError(utils.EcodeInvalidEndpoint, "missing app")
+		}
 		err := server.apps.UnplugWithApp(context.Background(), v.App, v.Ips)
 		if err != nil {
 			return JSONError(c, err)

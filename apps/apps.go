@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
+	"fmt"
 	"math/big"
 	"net"
 	"os"
@@ -434,7 +435,7 @@ func (ctrl *AppCtrl) UnplugWithApp(ctx context.Context, app string, addrs []stri
 }
 
 func (ctrl *AppCtrl) _deleteWithApp(ctx context.Context, clientIPs []string, app string) error {
-	key := appServicesPrefix
+	key := fmt.Sprintf("%s%s", appServicesPrefix, app)
 	opts := []clientv3.OpOption{}
 	opts = append(opts, clientv3.WithPrefix())
 	opts = append(opts, clientv3.WithKeysOnly())
@@ -450,6 +451,11 @@ func (ctrl *AppCtrl) _deleteWithApp(ctx context.Context, clientIPs []string, app
 	for _, kv := range kvs {
 		keyStr := string(kv.Key)
 		for _, ip := range clientIPs {
+			strs := strings.Split(ip, ".")
+			if len(strs) != 4 {
+				glog.Errorf("delete use illegal ip: %s with keystr: %s failed", ip, keyStr)
+				continue
+			}
 			if strings.Index(keyStr, ip) != -1 {
 				_, err := ctrl.etcdClient.Delete(ctx, keyStr)
 				if err != nil {
