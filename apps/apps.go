@@ -457,11 +457,12 @@ func (ctrl *AppCtrl) _deleteWithApp(ctx context.Context, clientIPs []string, app
 				continue
 			}
 			if strings.Index(keyStr, ip) != -1 {
+				glog.Infof("delete ip: %s with keystr: %s", ip, keyStr)
 				_, err := ctrl.etcdClient.Delete(ctx, keyStr)
 				if err != nil {
 					//TODO
-					glog.Errorf("delete ip: %s with keystr: %s failed", ip, keyStr)
-					continue
+					glog.Errorf("delete ip: %s with keystr: %s failed! %v", ip, keyStr, err)
+					return err
 				}
 			}
 		}
