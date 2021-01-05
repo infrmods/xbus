@@ -312,5 +312,5 @@ func (server *Server) registerAppAPIs(g *echo.Group) {
 	g.GET("/:name/online", echo.HandlerFunc(server.isAppNodeOnline))
 	g.GET("", echo.HandlerFunc(server.listApp))
 	g.PUT("", echo.HandlerFunc(server.newApp))
-	g.DELETE("/offlines", echo.HandlerFunc(server.v1UnplugServiceWithApp))
+	g.POST("/offlines", echo.HandlerFunc(server.v1UnplugServiceWithApp))
 }

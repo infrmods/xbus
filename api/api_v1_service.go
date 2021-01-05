@@ -2,6 +2,9 @@ package api
 
 import (
 	"context"
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
@@ -123,14 +126,11 @@ func (server *Server) v1UnplugService(c echo.Context) error {
 //aware is a expensive action
 func (server *Server) v1UnplugServiceWithApp(c echo.Context) error {
 	var descs []apps.AppIpsDesc
-	if c.FormValue("descs") != "" {
-		if ok, err := JSONFormParam(c, "descs", &descs); !ok {
-			return err
-		}
-	} else {
-		if ok, err := JSONFormParam(c, "desces", &descs); !ok {
-			return err
-		}
+	s, _ := ioutil.ReadAll(c.Request().Body)
+	err := json.Unmarshal([]byte(string(s)), &descs)
+	if err != nil {
+		return JSONErrorC(c, http.StatusBadRequest,
+			utils.Errorf(utils.EcodeInvalidParam, "invalid json (%s): %v", string(s), err))
 	}
 	if descs == nil || len(descs) == 0 {
 		return JSONError(c, utils.NewError(utils.EcodeMissingParam, "must have descs or desces"))
