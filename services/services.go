@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/ghodss/yaml"
 	"net"
 	"regexp"
 	"strings"
@@ -17,6 +18,16 @@ import (
 
 // DefaultZone default service zone
 const DefaultZone = "default"
+
+type ServiceDescProto struct {
+}
+
+//  service Proto descriptor
+type Proto struct {
+	Types     map[string]map[string]string `json:"types,omitempty"`
+	Service   string                       `json:"service,omitempty"`
+	Extension string                       `json:"extension,omitempty"`
+}
 
 // ServiceDescV1 service descriptor
 type ServiceDescV1 struct {
@@ -85,6 +96,7 @@ type Config struct {
 	NetMappings             []NetMapping `yaml:"net_mappings"`
 	BannedEndpointAddresses []string     `yaml:"banned_endpoint_addresses"`
 	bannedAddrRs            []*regexp.Regexp
+	DiffRevision            int64        `default:"10000" yaml:"diff_revision"`
 }
 
 func (config *Config) prepare() error {
@@ -285,6 +297,73 @@ func (ctrl *ServiceCtrl) QueryZones(ctx context.Context, clientIP net.IP, servic
 	}, resp.Header.Revision, nil
 }
 
+// QueryExtensionService query services with sRev and eRev
+func (ctrl *ServiceCtrl) QueryExtensionService(ctx context.Context, sRev int64, eRev int64) ([]map[string]string, error) {
+
+	distance := eRev - sRev
+	if distance > ctrl.config.DiffRevision {
+		return nil,utils.Errorf(utils.EcodeInvalidVersion,
+			"the revision difference No more than %d.", ctrl.config.DiffRevision)
+	}
+	if distance < 1{
+		return nil,utils.Errorf(utils.EcodeInvalidVersion,
+			"the revision difference not less 1.")
+	}
+
+	var serviceZoneSlice []map[string]string
+	serviceKey := ctrl.config.KeyPrefix
+	resp, err := ctrl.etcdClient.Get(ctx, serviceKey,
+		clientv3.WithPrefix(),
+		clientv3.WithMinModRev(sRev),
+		clientv3.WithMaxModRev(eRev))
+
+	if err != nil {
+		return nil, utils.CleanErr(err, "query fail", "Query() fail: %v", err)
+	}
+	if len(resp.Kvs) == 0 {
+		return serviceZoneSlice, nil
+	}
+
+	for _, kv := range resp.Kvs {
+		if kv.ModRevision <= sRev || kv.ModRevision > eRev {
+			continue
+		}
+		var serviceDesc ServiceDescV1
+		if err := json.Unmarshal(kv.Value, &serviceDesc); err != nil {
+			glog.Errorf("unmarshal service desc(key: %s) fail: %v", string(kv.Key), err)
+			continue
+		}
+
+		var body map[string]interface{}
+		err := yaml.Unmarshal([]byte(serviceDesc.Proto), &body)
+		if err != nil {
+			glog.Errorf("unmarshal service proto(key: %s) fail: %v", string(kv.Key), err)
+			continue
+		}
+		_, ok := body["extension"]
+
+		if !ok {
+			continue
+		}
+		serviceZone := map[string]string{"service":serviceDesc.Service,"zone":serviceDesc.Zone}
+		serviceZoneSlice = append(serviceZoneSlice,serviceZone)
+	}
+	return serviceZoneSlice, nil
+}
+
+// GetLastRevision
+func (ctrl *ServiceCtrl) GetLastRevision(ctx context.Context) (map[string]int64, error) {
+
+	RevisionMap:= make( map[string]int64,1)
+	resp, err := ctrl.etcdClient.Status(ctx,ctrl.etcdClient.Endpoints()[0])
+
+	if err != nil {
+		return nil, utils.CleanErr(err, "query fail", "Query() fail: %v", err)
+	}
+	RevisionMap["revision"] = resp.Header.Revision
+	return RevisionMap, nil
+}
+
 // QueryServiceZone query service zone with service key and zone
 func (ctrl *ServiceCtrl) QueryServiceZone(ctx context.Context, clientIP net.IP, service string, zone string) (*ServiceV1, int64, error) {
 	key := ctrl.serviceZoneKey(service, zone)
@@ -334,9 +413,21 @@ type ServiceDescEvent struct {
 	Service   ServiceDescV1 `json:"service"`
 }
 
+// ServiceZone
+type ServiceZone struct {
+	Service string `json:"service"`
+	Zone    string `json:"zone,omitempty"`
+}
+
 // ServiceDescWatchResult desc watch result
 type ServiceDescWatchResult struct {
 	Events   []ServiceDescEvent `json:"events"`
+	Revision int64              `json:"revision"`
+}
+
+// ServiceDescWatchResult desc watch result
+type ExtensionServices struct {
+	Sevices  []ServiceDescEvent `json:"events"`
 	Revision int64              `json:"revision"`
 }
 

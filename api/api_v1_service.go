@@ -136,6 +136,7 @@ func (server *Server) v1SearchService(c echo.Context) error {
 	return JSONResult(c, result)
 }
 
+
 type serviceQueryResultV1 struct {
 	Service  *services.ServiceV1 `json:"service"`
 	Revision int64               `json:"revision"`
@@ -224,4 +225,29 @@ func (server *Server) v1WatchServiceDesc(c echo.Context) error {
 		return JSONError(c, err)
 	}
 	return JSONResult(c, result)
+}
+
+func (server *Server) v1NeedUpdateExtensionServices(c echo.Context) error {
+	sRev, ok, err := IntQueryParamD(c, "start_revision", 0)
+	if !ok {
+		return JSONError(c,err)
+	}
+	eRev, ok, err := IntQueryParamD(c, "end_revision", 0)
+	if !ok {
+		return JSONError(c,err)
+	}
+	rev, err := server.services.QueryExtensionService(context.Background(),sRev,eRev)
+	if err != nil {
+		return JSONError(c, err)
+	}
+	return JSONResult(c, rev)
+
+}
+
+func (server *Server) v1GetLastReVision(c echo.Context) error {
+	rev, err := server.services.GetLastRevision(context.Background())
+	if err != nil {
+		return JSONError(c, err)
+	}
+	return JSONResult(c, rev)
 }

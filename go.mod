@@ -8,6 +8,7 @@ require (
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd v0.0.0-20190620071333-e64a0ec8b42a // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
+	github.com/ghodss/yaml v1.0.0
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/gocomm/config v0.0.0-20160322083158-b6ef2b8450a7
 	github.com/gocomm/dbutil v0.0.0-20181227073341-86f0416e8688
