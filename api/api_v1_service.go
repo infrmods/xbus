@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	"github.com/golang/glog"
 	"github.com/infrmods/xbus/apps"
 	"github.com/infrmods/xbus/services"
 	"github.com/infrmods/xbus/utils"
@@ -57,6 +58,7 @@ func (server *Server) v1PlugService(c echo.Context) error {
 		[]services.ServiceDescV1{desc}, &endpoint); err == nil {
 		return JSONResult(c, ServicePlugResult{LeaseID: leaseID, TTL: ttl})
 	}
+	glog.Errorf("plug service service (%s) zone (%s) from ip (%s) fail: %v", desc.Service, desc.Zone, server.getRemoteIPStr(c), err)
 	return JSONError(c, err)
 }
 
@@ -109,6 +111,7 @@ func (server *Server) v1PlugAllService(c echo.Context) error {
 		time.Duration(ttl)*time.Second, clientv3.LeaseID(leaseID),
 		descs, &endpoint)
 	if err != nil {
+		glog.Errorf("plug batch service from ip (%s) fail: %v", server.getRemoteIPStr(c), err)
 		return JSONError(c, err)
 	}
 	return JSONResult(c, ServicePlugResult{LeaseID: newLeaseID, TTL: ttl})
@@ -157,6 +160,7 @@ func (server *Server) v1SearchService(c echo.Context) error {
 	if !ok {
 		return err
 	}
+	glog.Info("search service from ip (%s) with uri (%s)", server.getRemoteIPStr(c), c.Request().RequestURI)
 	result, err := server.services.SearchService(c.QueryParam("q"), skip, limit)
 	if err != nil {
 		return JSONError(c, err)
@@ -221,6 +225,7 @@ func (server *Server) v1WatchService(c echo.Context) error {
 
 	service, rev, err := server.services.Watch(ctx, server.getRemoteIP(c), c.ParamValues()[0], revision)
 	if err != nil {
+		glog.Errorf("watch with service (%s) use rev (%d) from ip (%s) fail: %v", c.ParamValues()[0], revision, server.getRemoteIPStr(c), err)
 		return JSONError(c, err)
 	}
 	return JSONResult(c, serviceQueryResultV1{Service: service, Revision: rev})

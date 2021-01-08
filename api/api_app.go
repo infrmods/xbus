@@ -104,6 +104,7 @@ func (server *Server) watchAppNodes(c echo.Context) error {
 
 	nodes, err := server.apps.WatchAppNodes(ctx, appName, label, revision)
 	if err != nil {
+		glog.Errorf("watch node with app (%s), label (%s), revision (%d) from ip (%s) failed: %v", appName, label, revision, server.getRemoteIPStr(c), err)
 		return JSONError(c, err)
 	}
 	return JSONResult(c, nodes)
@@ -122,6 +123,7 @@ func (server *Server) isAppNodeOnline(c echo.Context) error {
 
 	online, err := server.apps.IsAppNodeOnline(context.Background(), appName, label, key)
 	if err != nil {
+		glog.Errorf("check nodeOnline with app (%s), label (%s), key (%s) from ip (%s) failed:%v", appName, label, key, server.getRemoteIPStr(c), err)
 		return JSONError(c, err)
 	}
 	return JSONResult(c, online)

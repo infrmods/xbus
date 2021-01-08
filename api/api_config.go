@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/infrmods/xbus/apps"
 	"github.com/infrmods/xbus/configs"
 	"github.com/infrmods/xbus/utils"
@@ -104,6 +105,7 @@ func (server *Server) getAllConfigs(c echo.Context) error {
 func (server *Server) deleteConfig(c echo.Context) error {
 	err := server.configs.Delete(context.Background(), c.ParamValues()[0])
 	if err != nil {
+		glog.Errorf("deleteConfig app (%s) from ip (%s) failed: %v", c.ParamValues()[0], server.getRemoteIPStr(c), err)
 		return JSONError(c, err)
 	}
 	return JSONOk(c)
@@ -127,6 +129,7 @@ func (server *Server) putConfig(c echo.Context) error {
 
 	rev, err := server.configs.Put(context.Background(), tag, c.ParamValues()[0], server.appID(c), remark, value, version)
 	if err != nil {
+		glog.Errorf("putConfig tag (%s),name (%s), appID (%d), remark (%s) version(%d) from ip (%s) failed: %v", tag, c.ParamValues()[0], server.appID(c), remark, version, server.getRemoteIPStr(c), err)
 		return JSONError(c, err)
 	}
 	return JSONResult(c, configPutResult{Revision: rev})

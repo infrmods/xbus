@@ -160,6 +160,10 @@ func (server *Server) getRemoteIP(c echo.Context) net.IP {
 	return nil
 }
 
+func (server *Server) getRemoteIPStr(c echo.Context) string {
+	return c.Request().RemoteAddr
+}
+
 func (server *Server) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 	return echo.HandlerFunc(func(c echo.Context) error {
 		var appName string
