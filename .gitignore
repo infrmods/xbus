@@ -30,3 +30,4 @@ _testmain.go
 *.yml
 *.yaml
 .vscode
+.idea
