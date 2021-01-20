@@ -45,8 +45,6 @@ const (
 	EcodeNameDuplicated = "NAME_DUPLICATED"
 	// EcodeNotPermitted NOT_PERMITTED
 	EcodeNotPermitted = "NOT_PERMITTED"
-	// EcodeEtcdWatchFailed ETCD_WATCH_FAILED
-	EcodeEtcdWatchFailed = "ETCD_WATCH_FAILED"
 )
 
 // Error error
