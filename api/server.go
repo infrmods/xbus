@@ -18,6 +18,7 @@ import (
 	"github.com/infrmods/xbus/configs"
 	"github.com/infrmods/xbus/services"
 	"github.com/infrmods/xbus/utils"
+	"github.com/labstack/echo-contrib/prometheus"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -94,6 +95,8 @@ func (server *Server) prepare() {
 	server.registerConfigAPIs(server.e.Group("/api/configs"))
 	server.registerAppAPIs(server.e.Group("/api/apps"))
 	server.registerLeaseAPIs(server.e.Group("/api/leases"))
+	p := prometheus.NewPrometheus("xbus", nil)
+	p.Use(server.e)
 }
 
 // Run run server
