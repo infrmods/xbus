@@ -40,13 +40,17 @@ func (cmd *RunCmd) Usage() string {
 func (cmd *RunCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	x := NewXBus()
 	db := x.NewDB()
-	etcdClient := x.NewEtcdClient()
+	etcdClient := x.Config.Etcd.NewEtcdClient()
+	configEtcdClient := etcdClient
 	services, err := services.NewServiceCtrl(&x.Config.Services, db, etcdClient)
 	if err != nil {
 		glog.Errorf("create service fail: %v", err)
 		os.Exit(-1)
 	}
-	configs := configs.NewConfigCtrl(&x.Config.Configs, db, etcdClient)
+	if x.Config.Configs.Etcd != nil {
+		configEtcdClient = x.Config.Configs.Etcd.NewEtcdClient()
+	}
+	configs := configs.NewConfigCtrl(&x.Config.Configs, db, configEtcdClient)
 	apiServer := api.NewServer(&x.Config.API, etcdClient, services, configs, x.NewAppCtrl(db, etcdClient))
 	if err := apiServer.Run(); err != nil {
 		glog.Errorf("start api_sersver fail: %v", err)
