@@ -219,6 +219,13 @@ func (server *Server) v1WatchServiceDesc(c echo.Context) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancelFunc()
 
+	if !server.ProtoSwitch {
+		result, err := server.services.WatchServiceDescBack(ctx, zone, revision)
+		if err != nil {
+			return JSONError(c, err)
+		}
+		return JSONResult(c, result)
+	}
 	result, err := server.services.WatchServiceDesc(ctx, zone, revision)
 	if err != nil {
 		return JSONError(c, err)

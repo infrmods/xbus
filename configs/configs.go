@@ -23,8 +23,8 @@ type ConfigItem struct {
 
 // Config module config
 type Config struct {
-	KeyPrefix string `default:"/configs" yaml:"key_prefix"`
-	Etcd *utils.ETCDConfig `default:"-"`
+	KeyPrefix string            `default:"/configs" yaml:"key_prefix"`
+	Etcd      *utils.ETCDConfig `default:"-"`
 }
 
 // ConfigCtrl config ctrl

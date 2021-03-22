@@ -67,6 +67,8 @@ type Server struct {
 	apps       *apps.AppCtrl
 
 	e *echo.Echo
+
+	ProtoSwitch bool
 }
 
 // NewServer new api server
@@ -74,8 +76,27 @@ func NewServer(config *Config, etcdClient *clientv3.Client,
 	servs *services.ServiceCtrl, cfgs *configs.ConfigCtrl, apps *apps.AppCtrl) *Server {
 	server := &Server{config: *config, tls: config.CertFile != "",
 		etcdClient: etcdClient,
-		services:   servs, configs: cfgs, apps: apps, e: echo.New()}
+		services:   servs, configs: cfgs, apps: apps, e: echo.New(), ProtoSwitch: false}
+	server.services.ProtoSwitch = server.ProtoSwitch
 	server.prepare()
+	go func() {
+		for {
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+			protoSwitch := "/xbus/proto/switch"
+			resp, err := server.etcdClient.Get(ctx, protoSwitch)
+			if err != nil {
+				glog.Infof("get proto switch fail %v", err)
+				server.ProtoSwitch = false
+				server.services.ProtoSwitch = server.ProtoSwitch
+			} else {
+				server.ProtoSwitch = len(resp.Kvs) == 0
+				server.services.ProtoSwitch = server.ProtoSwitch
+			}
+			cancel()
+			glog.Infof("current proto switch statue %v", server.ProtoSwitch)
+			time.Sleep(time.Duration(5) * time.Second)
+		}
+	}()
 	return server
 }
 
