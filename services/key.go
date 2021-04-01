@@ -80,6 +80,17 @@ func (ctrl *ServiceCtrl) serviceDescNotifyKey(service, zone string) string {
 	return fmt.Sprintf("%s-descs/%s/%s", ctrl.config.KeyPrefix, zone, service)
 }
 
+func (ctrl *ServiceCtrl) serviceM5NotifyKey(service, zone string) string {
+	return fmt.Sprintf("%s-md5s/%s/%s", ctrl.config.KeyPrefix, zone, service)
+}
+
+func (ctrl *ServiceCtrl) serviceM5NotifyPrefix(zone string) string {
+	if zone != "" {
+		return fmt.Sprintf("%s-md5s/%s/", ctrl.config.KeyPrefix, zone)
+	}
+	return fmt.Sprintf("%s-md5s/", ctrl.config.KeyPrefix)
+}
+
 func (ctrl *ServiceCtrl) serviceDescNotifyKeyPrefix(zone string) string {
 	if zone != "" {
 		return fmt.Sprintf("%s-descs/%s/", ctrl.config.KeyPrefix, zone)
@@ -94,6 +105,17 @@ type serviceDescKey struct {
 
 func (ctrl *ServiceCtrl) splitServiceDescNotifyKey(key string) *serviceDescKey {
 	prefix := ctrl.config.KeyPrefix + "-descs/"
+	if strings.HasPrefix(key, prefix) {
+		parts := strings.Split(key[len(prefix):], "/")
+		if len(parts) == 2 {
+			return &serviceDescKey{zone: parts[0], service: parts[1]}
+		}
+	}
+	return nil
+}
+
+func (ctrl *ServiceCtrl) splitServiceM5NotifyKey(key string) *serviceDescKey {
+	prefix := ctrl.config.KeyPrefix + "-md5s/"
 	if strings.HasPrefix(key, prefix) {
 		parts := strings.Split(key[len(prefix):], "/")
 		if len(parts) == 2 {

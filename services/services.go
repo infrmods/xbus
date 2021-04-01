@@ -2,9 +2,11 @@ package services
 
 import (
 	"context"
+	"crypto/md5"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"regexp"
 	"strings"
@@ -25,6 +27,7 @@ type ServiceDescV1 struct {
 	Type        string `json:"type,omitempty"`
 	Proto       string `json:"proto,omitempty"`
 	Description string `json:"description,omitempty"`
+	Md5         string `json:"-"`
 }
 
 // Marshal marshal impl
@@ -136,9 +139,10 @@ func (config *Config) mapAddress(addr string, clientIP net.IP) string {
 
 // ServiceCtrl service module controller
 type ServiceCtrl struct {
-	config     Config
-	db         *sql.DB
-	etcdClient *clientv3.Client
+	config      Config
+	db          *sql.DB
+	etcdClient  *clientv3.Client
+	ProtoSwitch bool
 }
 
 // NewServiceCtrl new service ctrl
@@ -147,7 +151,7 @@ func NewServiceCtrl(config *Config, db *sql.DB, etcdClient *clientv3.Client) (*S
 		return nil, err
 	}
 	glog.Infof("%#v", *config)
-	services := &ServiceCtrl{config: *config, db: db, etcdClient: etcdClient}
+	services := &ServiceCtrl{config: *config, db: db, etcdClient: etcdClient, ProtoSwitch: false}
 	if strings.HasSuffix(services.config.KeyPrefix, "/") {
 		services.config.KeyPrefix = services.config.KeyPrefix[:len(services.config.KeyPrefix)-1]
 	}
@@ -166,6 +170,94 @@ func checkDesc(desc *ServiceDescV1) error {
 
 // PlugAll plug services
 func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
+	ttl time.Duration, leaseID clientv3.LeaseID,
+	descs []ServiceDescV1, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
+
+	if !ctrl.ProtoSwitch {
+		return ctrl.PlugAllBack(ctx, ttl, leaseID, descs, endpoint)
+	}
+
+	if err := ctrl.checkAddress(endpoint.Address); err != nil {
+		return 0, err
+	}
+	for _, desc := range descs {
+		if err := checkDesc(&desc); err != nil {
+			return 0, err
+		}
+	}
+	endpointData, err := endpoint.Marshal()
+	if err != nil {
+		return 0, err
+	}
+	endpointValue := string(endpointData)
+	if ttl > 0 && leaseID == 0 {
+		if resp, err := ctrl.etcdClient.Lease.Grant(ctx, int64(ttl.Seconds())); err == nil {
+			leaseID = clientv3.LeaseID(resp.ID)
+		} else {
+			return 0, utils.CleanErr(err, "create lease fail", "create lease fail: %v", err)
+		}
+	}
+
+	updateOps := make([]clientv3.Op, 0, len(descs)*2)
+
+	for i := range descs {
+		desc := &descs[i]
+		descData, err := desc.Marshal()
+		if err != nil {
+			return 0, err
+		}
+		descValue := string(descData)
+		protoStr := desc.Proto
+		w := md5.New()
+		io.WriteString(w, protoStr)
+		desc.Md5 = fmt.Sprintf("%x", w.Sum(nil))
+		descKey := ctrl.serviceDescKey(desc.Service, desc.Zone)
+		protoMd5Key := ctrl.serviceM5NotifyKey(desc.Service, desc.Zone)
+		updateOps = append(updateOps,
+			clientv3.OpTxn(
+				[]clientv3.Cmp{clientv3.Compare(clientv3.Value(protoMd5Key), "=", desc.Md5)},
+				nil,
+				[]clientv3.Op{
+					clientv3.OpPut(protoMd5Key, desc.Md5),
+					clientv3.OpPut(descKey, descValue),
+					clientv3.OpPut(ctrl.serviceDescNotifyKey(desc.Service, desc.Zone), descValue),
+				},
+			))
+
+		nodeKey := ctrl.serviceNodeKey(desc.Service, desc.Zone, endpoint.Address)
+		var opPut clientv3.Op
+		if leaseID > 0 {
+			opPut = clientv3.OpPut(nodeKey, endpointValue, clientv3.WithLease(leaseID))
+		} else {
+			opPut = clientv3.OpPut(nodeKey, endpointValue)
+		}
+		updateOps = append(updateOps,
+			clientv3.OpTxn(
+				[]clientv3.Cmp{
+					clientv3.Compare(clientv3.Value(nodeKey), "=", endpointValue),
+					clientv3.Compare(clientv3.LeaseValue(nodeKey), "=", leaseID),
+				},
+				nil,
+				[]clientv3.Op{opPut},
+			))
+	}
+	if err := ctrl.updateServiceDBItems(descs); err != nil {
+		glog.Errorf("update service db items fail: %v", err)
+		return 0, utils.NewError(utils.EcodeSystemError, "update db fail")
+	}
+	if _, err := ctrl.etcdClient.Txn(ctx).Then(updateOps...).Commit(); err != nil {
+		return 0, utils.CleanErr(err, "plug service fail",
+			"put services node fail: %v", err)
+	}
+	if err := ctrl.updateServiceDBItemsCommit(descs); err != nil {
+		glog.Errorf("update service db items fail: %v", err)
+		return 0, utils.NewError(utils.EcodeSystemError, "update db fail")
+	}
+	return leaseID, nil
+}
+
+// PlugAll plug services
+func (ctrl *ServiceCtrl) PlugAllBack(ctx context.Context,
 	ttl time.Duration, leaseID clientv3.LeaseID,
 	descs []ServiceDescV1, endpoint *ServiceEndpoint) (clientv3.LeaseID, error) {
 	if err := ctrl.checkAddress(endpoint.Address); err != nil {
@@ -229,7 +321,7 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 			"put services node fail: %v", err)
 	}
 
-	if err := ctrl.updateServiceDBItems(descs); err != nil {
+	if err := ctrl.updateServiceDBItemsBack(descs); err != nil {
 		glog.Errorf("update service db items fail: %v", err)
 		return 0, utils.NewError(utils.EcodeSystemError, "update db fail")
 	}
@@ -257,7 +349,7 @@ func (ctrl *ServiceCtrl) Query(ctx context.Context, clientIP net.IP, service str
 		return nil, 0, err
 	}
 
-	return ctrl._query(ctx, clientIP, service)
+	return ctrl._queryBack(ctx, clientIP, service)
 }
 
 // QueryZones query services with raw zone
@@ -291,7 +383,7 @@ func (ctrl *ServiceCtrl) QueryServiceZone(ctx context.Context, clientIP net.IP, 
 	return ctrl._query(ctx, clientIP, key) // key 为 `service/zone`
 }
 
-func (ctrl *ServiceCtrl) _query(ctx context.Context, clientIP net.IP, serviceKey string) (*ServiceV1, int64, error) {
+func (ctrl *ServiceCtrl) _queryBack(ctx context.Context, clientIP net.IP, serviceKey string) (*ServiceV1, int64, error) {
 	key := ctrl.serviceEntryPrefix(serviceKey)
 	resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix())
 	if err != nil {
@@ -301,7 +393,27 @@ func (ctrl *ServiceCtrl) _query(ctx context.Context, clientIP net.IP, serviceKey
 	if len(resp.Kvs) == 0 {
 		return nil, 0, utils.Errorf(utils.EcodeNotFound, "no such service: %s", serviceKey)
 	}
-	service, err := ctrl.makeService(clientIP, serviceKey, resp.Kvs)
+	service, err := ctrl.makeServiceBack(clientIP, serviceKey, resp.Kvs)
+	if err != nil {
+		return nil, 0, err
+	}
+	return service, resp.Header.Revision, nil
+}
+
+func (ctrl *ServiceCtrl) _query(ctx context.Context, clientIP net.IP, serviceKey string) (*ServiceV1, int64, error) {
+	key := ctrl.serviceEntryPrefix(serviceKey)
+	if !ctrl.ProtoSwitch {
+		return ctrl._queryBack(ctx, clientIP, serviceKey)
+	}
+	resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix(), clientv3.WithKeysOnly())
+	if err != nil {
+		return nil, 0, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", key, err)
+	}
+
+	if len(resp.Kvs) == 0 {
+		return nil, 0, utils.Errorf(utils.EcodeNotFound, "no such service: %s", serviceKey)
+	}
+	service, err := ctrl.makeService(ctx, clientIP, serviceKey, resp.Kvs)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -342,6 +454,78 @@ type ServiceDescWatchResult struct {
 
 // WatchServiceDesc watch service desc
 func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revision int64) (*ServiceDescWatchResult, error) {
+	prefix := ctrl.serviceM5NotifyPrefix(zone)
+	watcher := clientv3.NewWatcher(ctrl.etcdClient)
+	defer watcher.Close()
+
+	var watchCh clientv3.WatchChan
+	if revision > 0 {
+		watchCh = watcher.Watch(ctx, prefix, clientv3.WithRev(revision), clientv3.WithPrefix())
+	} else {
+		watchCh = watcher.Watch(ctx, prefix, clientv3.WithPrefix())
+	}
+
+	for {
+		resp, ok := <-watchCh
+		if !ok {
+			return nil, nil
+		}
+		if resp.Err() != nil {
+			return nil, utils.CleanErr(resp.Err(), "watch service desc fail", "watch service desc(zone:%s) fail: %v", zone, resp.Err())
+		}
+
+		events := make([]ServiceDescEvent, 0, 8)
+		for _, event := range resp.Events {
+			var eventType string
+			var serviceDesc ServiceDescV1 = ServiceDescV1{}
+			var md5 string
+
+			if event.Type == clientv3.EventTypePut {
+				eventType = "put"
+				md5 = string(event.Kv.Value)
+				matches := rServiceSplit.FindAllStringSubmatch(string(event.Kv.Key), -1)
+				if len(matches) != 1 {
+					glog.Warningf("got unexpected service node: %s", string(event.Kv.Key))
+					continue
+				}
+				service := matches[0][3]
+				sDTmp, err := ctrl.SearchBymd5(service, md5)
+				if err != nil {
+					continue
+				}
+				if sDTmp == nil {
+					glog.Errorf("find by md5 not found %s,%s", service, md5)
+					continue
+				}
+				serviceDesc.Description = sDTmp.Description
+				serviceDesc.Md5 = sDTmp.Md5
+				serviceDesc.Proto = sDTmp.Proto
+				serviceDesc.Type = sDTmp.Type
+				serviceDesc.Service = sDTmp.Service
+				serviceDesc.Zone = sDTmp.Zone
+			} else if event.Type == clientv3.EventTypeDelete {
+				eventType = "delete"
+				key := ctrl.splitServiceM5NotifyKey(string(event.Kv.Key))
+				if key == nil {
+					glog.Warningf("invalid service-desc key: %s", string(event.Kv.Key))
+					continue
+				}
+				serviceDesc.Service = key.service
+				serviceDesc.Zone = key.zone
+			} else {
+				continue
+			}
+
+			events = append(events, ServiceDescEvent{EventType: eventType, Service: serviceDesc})
+		}
+		if len(events) > 0 {
+			return &ServiceDescWatchResult{Events: events, Revision: resp.Header.Revision}, nil
+		}
+	}
+}
+
+// WatchServiceDesc watch service desc
+func (ctrl *ServiceCtrl) WatchServiceDescBack(ctx context.Context, zone string, revision int64) (*ServiceDescWatchResult, error) {
 	prefix := ctrl.serviceDescNotifyKeyPrefix(zone)
 	watcher := clientv3.NewWatcher(ctrl.etcdClient)
 	defer watcher.Close()
@@ -377,7 +561,7 @@ func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revi
 				eventType = "delete"
 				key := ctrl.splitServiceDescNotifyKey(string(event.Kv.Key))
 				if key == nil {
-					glog.Warning("invalid service-desc key: %s", string(event.Kv.Key))
+					glog.Warningf("invalid service-desc key: %s", string(event.Kv.Key))
 					continue
 				}
 				serviceDesc.Service = key.service
@@ -410,6 +594,7 @@ func (ctrl *ServiceCtrl) Delete(ctx context.Context, serviceKey string, zone str
 			_, err := ctrl.etcdClient.Txn(ctx).Then([]clientv3.Op{
 				clientv3.OpDelete(ctrl.serviceDescKey(serviceKey, zone)),
 				clientv3.OpDelete(ctrl.serviceDescNotifyKey(serviceKey, zone)),
+				clientv3.OpDelete(ctrl.serviceM5NotifyKey(zone, serviceKey)),
 			}...).Commit()
 			if err != nil {
 				return utils.CleanErr(err, "delete service keys fail", "delete service keys(%s) fail: %v", entryPrefix, err)

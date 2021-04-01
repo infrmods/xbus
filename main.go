@@ -31,7 +31,7 @@ type Config struct {
 	DB struct {
 		Driver  string `default:"mysql"`
 		Source  string `default:"root:passwd@/xbus?parseTime=true"`
-		MaxConn int    `default:"20"`
+		MaxConn int    `default:"100"`
 	}
 }
 
@@ -86,7 +86,7 @@ func main() {
 	subcommands.Register(&NewAppCmd{}, "")
 	subcommands.Register(&RunCmd{}, "")
 	subcommands.Register(&GenRootCmd{}, "")
-	subcommands.Register(&ListAppCmd{}, "")
+	subcommands.Register(&FixCmd{}, "")
 	subcommands.Register(&ListGroupCmd{}, "")
 	subcommands.Register(&ListPermCmd{}, "")
 	subcommands.Register(&GrantCmd{}, "")
