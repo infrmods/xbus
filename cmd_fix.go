@@ -50,12 +50,12 @@ func (cmd *FixCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{})
 	if rows, err := db.Query(`select count(1) from services`); err == nil {
 		for rows.Next() {
 			if err := rows.Scan(&total); err != nil {
-				println(err)
+				glog.Errorf("get services count from db failed: %v", err)
 				return subcommands.ExitSuccess
 			}
 		}
 	} else {
-		println(err)
+		glog.Errorf("get services count from db failed: %v", err)
 		return subcommands.ExitSuccess
 	}
 	println(total)
@@ -65,29 +65,30 @@ func (cmd *FixCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{})
 			for rows.Next() {
 				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 				defer cancel()
-				var service, zone, typ, proto, description, md55 string
-				if err := rows.Scan(&service, &zone, &typ, &proto, &description, &md55); err != nil {
-					println(err)
-					continue
+				var service, zone, typ, proto, description, md5Str string
+				if err := rows.Scan(&service, &zone, &typ, &proto, &description, &md5Str); err != nil {
+					glog.Errorf("get service data to variable failed: %v", err)
+					return subcommands.ExitSuccess
 				}
 				w := md5.New()
 				io.WriteString(w, proto)
 				md5Tmp := fmt.Sprintf("%x", w.Sum(nil))
 				println(md5Tmp)
 				key := cmd.serviceM5NotifyKey(service, zone)
-				println(key)
+				glog.Infof("write etcd with key: %s", key)
 				_, err := etcdClient.Put(ctx, key, md5Tmp)
 				if err != nil {
-					glog.Infof("get proto switch fail %v", err)
+					glog.Errorf("write etcd with proto md5 failed: %v", err)
+					return subcommands.ExitSuccess
 				} else {
-
+					//ignore
 				}
 			}
-
 		} else {
-			println(err)
+			glog.Errorf("select data from services failed: %v", err)
 			return subcommands.ExitSuccess
 		}
+		glog.Infof("fix proto data successed")
 		start += 1000
 	}
 	return subcommands.ExitSuccess

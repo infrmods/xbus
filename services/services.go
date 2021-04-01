@@ -207,9 +207,9 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 			return 0, err
 		}
 		descValue := string(descData)
-		descValue2 := desc.Proto
+		protoStr := desc.Proto
 		w := md5.New()
-		io.WriteString(w, descValue2)
+		io.WriteString(w, protoStr)
 		desc.Md5 = fmt.Sprintf("%x", w.Sum(nil))
 		descKey := ctrl.serviceDescKey(desc.Service, desc.Zone)
 		protoMd5Key := ctrl.serviceM5NotifyKey(desc.Service, desc.Zone)
