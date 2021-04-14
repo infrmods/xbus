@@ -86,8 +86,9 @@ func NewServer(config *Config, etcdClient *clientv3.Client,
 			resp, err := server.etcdClient.Get(ctx, protoSwitch)
 			if err != nil {
 				glog.Infof("get proto switch fail %v", err)
-				server.ProtoSwitch = false
-				server.services.ProtoSwitch = server.ProtoSwitch
+				//异常不进行任何操作，防止网络问题导致切换回从etcd读取proto数据(后续会逐步移除etcd内部的proto数据)
+				//server.ProtoSwitch = false
+				//server.services.ProtoSwitch = server.ProtoSwitch
 			} else {
 				server.ProtoSwitch = len(resp.Kvs) == 0
 				server.services.ProtoSwitch = server.ProtoSwitch

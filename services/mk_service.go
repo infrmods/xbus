@@ -49,14 +49,14 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 			continue
 		}
 		zone, suffix := matches[0][2], matches[0][3]
-		if strings.HasPrefix(suffix, serviceKeyNodePrefix) {
+		if strings.HasPrefix(suffix, serviceDescNodeKey) {
 			serviceZone := zones[zone]
 			if serviceZone == nil {
 				serviceZone = &ServiceZoneV1{Endpoints: make([]ServiceEndpoint, 0)}
 				zones[zone] = serviceZone
 			}
-			getOps = append(getOps, clientv3.OpGet(string(kv.Key)))
 		}
+		getOps = append(getOps, clientv3.OpGet(string(kv.Key)))
 	}
 
 	if len(getOps) > 0 {
@@ -69,16 +69,22 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 				if ev.Value == nil || len(ev.Value) == 0 {
 					continue
 				}
-				var endpoint ServiceEndpoint
-				if err := json.Unmarshal(ev.Value, &endpoint); err != nil {
-					glog.Errorf("unmarshal endpoint fail(%#v): %v", string(ev.Value), err)
-					return nil, utils.NewError(utils.EcodeDamagedEndpointValue, "")
-				}
-				endpoint.Address = ctrl.config.mapAddress(endpoint.Address, clientIP)
 				matches := rServiceSplit.FindAllStringSubmatch(string(ev.Key), -1)
-				zone := matches[0][2]
-				serviceZone := zones[zone]
-				serviceZone.Endpoints = append(serviceZone.Endpoints, endpoint)
+				suffix := matches[0][3]
+
+				if strings.HasPrefix(suffix, serviceKeyNodePrefix) {
+					var endpoint ServiceEndpoint
+					if err := json.Unmarshal(ev.Value, &endpoint); err != nil {
+						glog.Errorf("unmarshal endpoint fail(%#v): %v", string(ev.Value), err)
+						return nil, utils.NewError(utils.EcodeDamagedEndpointValue, "")
+					}
+					endpoint.Address = ctrl.config.mapAddress(endpoint.Address, clientIP)
+					matches := rServiceSplit.FindAllStringSubmatch(string(ev.Key), -1)
+					zone := matches[0][2]
+					serviceZone := zones[zone]
+					serviceZone.Endpoints = append(serviceZone.Endpoints, endpoint)
+				}
+
 			}
 		}
 	}
@@ -94,10 +100,10 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 			continue
 		}
 		zone := matches[0][2]
-		serviceZone := zones[zone]
-		if serviceZone == nil || len(serviceZone.Endpoints) == 0 {
-			continue
-		}
+		//serviceZone := zones[zone]
+		//if serviceZone == nil || len(serviceZone.Endpoints) == 0 {
+		//	continue
+		//}
 		getOps = append(getOps,
 			clientv3.OpGet(ctrl.serviceM5NotifyKey(strings.Split(matches[0][1], "/")[1], zone)))
 	}
@@ -192,10 +198,10 @@ func (ctrl *ServiceCtrl) makeServiceBatch(ctx context.Context, clientIP net.IP, 
 			continue
 		}
 		zone := matches[0][2]
-		serviceZone := zones[zone]
-		if serviceZone == nil || len(serviceZone.Endpoints) == 0 {
-			continue
-		}
+		//serviceZone := zones[zone]
+		//if serviceZone == nil || len(serviceZone.Endpoints) == 0 {
+		//	continue
+		//}
 		getOps = append(getOps,
 			clientv3.OpGet(ctrl.serviceM5NotifyKey(strings.Split(matches[0][1], "/")[1], zone)))
 	}

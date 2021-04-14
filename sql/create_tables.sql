@@ -198,3 +198,9 @@ CREATE TABLE `services` (
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2018-05-06 22:48:47
+
+alter table services add `proto_md5` varchar(64) DEFAULT NULL;
+alter table services add `md5_status` tinyint(1) DEFAULT '1';
+alter table services add KEY `MD5_INDEX` (`proto_md5`);
+alter table services modify `extension` varchar(16) DEFAULT NULL;
+alter table services modify `proto` longtext COMMENT '服务元信息';

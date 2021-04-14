@@ -348,7 +348,9 @@ func (ctrl *ServiceCtrl) Query(ctx context.Context, clientIP net.IP, service str
 	if err := checkService(service); err != nil {
 		return nil, 0, err
 	}
-
+	if ctrl.ProtoSwitch {
+		return ctrl._query(ctx, clientIP, service)
+	}
 	return ctrl._queryBack(ctx, clientIP, service)
 }
 
