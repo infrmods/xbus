@@ -79,7 +79,7 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 						return nil, utils.NewError(utils.EcodeDamagedEndpointValue, "")
 					}
 					endpoint.Address = ctrl.config.mapAddress(endpoint.Address, clientIP)
-					matches := rServiceSplit.FindAllStringSubmatch(string(ev.Key), -1)
+					//matches := rServiceSplit.FindAllStringSubmatch(string(ev.Key), -1)
 					zone := matches[0][2]
 					serviceZone := zones[zone]
 					serviceZone.Endpoints = append(serviceZone.Endpoints, endpoint)
@@ -120,12 +120,12 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 				}
 				zone, service := matches[0][2], matches[0][3]
 				//TODO batch use SearchOnlyBymd5s
-				serviceDesc, err := ctrl.SearchBymd5(service, string(ev.Value))
+				serviceDesc, err := ctrl.SearchBymd5(service, zone)
 				if err != nil {
 					return nil, err
 				}
 				if serviceDesc == nil {
-					glog.Errorf("find by md5 not found %s,%s", service, string(ev.Value))
+					glog.Errorf("find by md5 not found %s,%s,%s", service, zone, string(ev.Value))
 					continue
 				}
 				serviceZone := zones[zone]
@@ -221,12 +221,12 @@ func (ctrl *ServiceCtrl) makeServiceBatch(ctx context.Context, clientIP net.IP, 
 			}
 			zone, service := matches[0][2], matches[0][3]
 			//TODO batch use SearchOnlyBymd5s
-			serviceDesc, err := ctrl.SearchBymd5(service, string(ev.Value))
+			serviceDesc, err := ctrl.SearchBymd5(service, zone)
 			if err != nil {
 				return nil, err
 			}
 			if serviceDesc == nil {
-				glog.Errorf("find by md5 not found %s,%s", service, string(ev.Value))
+				glog.Errorf("find by md5 not found %s,%s,%s", service, zone, string(ev.Value))
 				continue
 			}
 			serviceZone := zones[zone]

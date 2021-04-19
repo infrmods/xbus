@@ -61,7 +61,7 @@ func (cmd *FixCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{})
 	println(total)
 	for start <= total {
 		if rows, err := db.Query(`select service, zone, typ, proto, description, proto_md5 from services 
-				order by modify_time desc limit ?,?`, start, 1000); err == nil {
+				order by create_time  desc limit ?,?`, start, 1000); err == nil {
 			for rows.Next() {
 				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 				defer cancel()

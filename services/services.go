@@ -491,12 +491,12 @@ func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revi
 					continue
 				}
 				service := matches[0][3]
-				sDTmp, err := ctrl.SearchBymd5(service, md5)
+				sDTmp, err := ctrl.SearchBymd5(service, zone)
 				if err != nil {
 					continue
 				}
 				if sDTmp == nil {
-					glog.Errorf("find by md5 not found %s,%s", service, md5)
+					glog.Errorf("find by md5 not found %s,%s,%s", service, zone, md5)
 					continue
 				}
 				serviceDesc.Description = sDTmp.Description
