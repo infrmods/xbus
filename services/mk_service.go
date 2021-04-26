@@ -89,7 +89,7 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 		}
 	}
 
-	getOps = make([]clientv3.Op, 0)
+	//getOps = make([]clientv3.Op, 0)
 	for _, kv := range kvs {
 		matches := rServiceSplit.FindAllStringSubmatch(string(kv.Key), -1)
 		if len(matches) != 1 {
@@ -104,40 +104,42 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 		//if serviceZone == nil || len(serviceZone.Endpoints) == 0 {
 		//	continue
 		//}
-		getOps = append(getOps,
-			clientv3.OpGet(ctrl.serviceM5NotifyKey(strings.Split(matches[0][1], "/")[1], zone)))
-	}
-	if len(getOps) > 0 {
-		resp, err := ctrl.etcdClient.Txn(context.TODO()).If().Then(getOps...).Commit()
+		//getOps = append(getOps,
+		//	clientv3.OpGet(ctrl.serviceM5NotifyKey(strings.Split(matches[0][1], "/")[1], zone)))
+		service := strings.Split(matches[0][1], "/")[1]
+		serviceDesc, err := ctrl.SearchBymd5(service, zone)
 		if err != nil {
-			return nil, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", serviceKey, err)
+			return nil, err
 		}
-		for _, rp := range resp.Responses {
-			for _, ev := range rp.GetResponseRange().Kvs {
-				matches := rServiceSplit.FindAllStringSubmatch(string(ev.Key), -1)
-				if len(matches) != 1 {
-					continue
-				}
-				zone, service := matches[0][2], matches[0][3]
-				//TODO batch use SearchOnlyBymd5s
-				serviceDesc, err := ctrl.SearchBymd5(service, zone)
-				if err != nil {
-					return nil, err
-				}
-				if serviceDesc == nil {
-					glog.Errorf("find by md5 not found %s,%s,%s", service, zone, string(ev.Value))
-					continue
-				}
-				serviceZone := zones[zone]
-				serviceZone.Description = serviceDesc.Description
-				serviceZone.Md5 = serviceDesc.Md5
-				serviceZone.Proto = serviceDesc.Proto
-				serviceZone.Type = serviceDesc.Type
-				serviceZone.Service = serviceKey
-				serviceZone.Zone = zone
-			}
+		if serviceDesc == nil {
+			glog.Errorf("find by md5 not found %s,%s", service, zone)
+			continue
 		}
+		serviceZone := zones[zone]
+		serviceZone.Description = serviceDesc.Description
+		serviceZone.Md5 = serviceDesc.Md5
+		serviceZone.Proto = serviceDesc.Proto
+		serviceZone.Type = serviceDesc.Type
+		serviceZone.Service = serviceKey
+		serviceZone.Zone = zone
 	}
+	//if len(getOps) > 0 {
+	//	resp, err := ctrl.etcdClient.Txn(context.TODO()).If().Then(getOps...).Commit()
+	//	if err != nil {
+	//		return nil, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", serviceKey, err)
+	//	}
+	//	for _, rp := range resp.Responses {
+	//		for _, ev := range rp.GetResponseRange().Kvs {
+	//			matches := rServiceSplit.FindAllStringSubmatch(string(ev.Key), -1)
+	//			if len(matches) != 1 {
+	//				continue
+	//			}
+	//			zone, service := matches[0][2], matches[0][3]
+	//			//TODO batch use SearchOnlyBymd5s
+	//
+	//		}
+	//	}
+	//}
 	return &ServiceV1{Service: serviceKey, Zones: zones}, nil
 }
 

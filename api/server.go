@@ -76,7 +76,7 @@ func NewServer(config *Config, etcdClient *clientv3.Client,
 	servs *services.ServiceCtrl, cfgs *configs.ConfigCtrl, apps *apps.AppCtrl) *Server {
 	server := &Server{config: *config, tls: config.CertFile != "",
 		etcdClient: etcdClient,
-		services:   servs, configs: cfgs, apps: apps, e: echo.New(), ProtoSwitch: false}
+		services:   servs, configs: cfgs, apps: apps, e: echo.New(), ProtoSwitch: true}
 	server.services.ProtoSwitch = server.ProtoSwitch
 	server.prepare()
 	go func() {

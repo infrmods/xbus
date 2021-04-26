@@ -87,6 +87,7 @@ func main() {
 	subcommands.Register(&RunCmd{}, "")
 	subcommands.Register(&GenRootCmd{}, "")
 	subcommands.Register(&FixCmd{}, "")
+	subcommands.Register(&ConsistencyFixCmd{}, "")
 	subcommands.Register(&ListGroupCmd{}, "")
 	subcommands.Register(&ListPermCmd{}, "")
 	subcommands.Register(&GrantCmd{}, "")

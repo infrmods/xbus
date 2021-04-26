@@ -490,13 +490,13 @@ func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revi
 					glog.Warningf("got unexpected service node: %s", string(event.Kv.Key))
 					continue
 				}
-				service := matches[0][3]
-				sDTmp, err := ctrl.SearchBymd5(service, zone)
+				zoneTmp, service := matches[0][2], matches[0][3]
+				sDTmp, err := ctrl.SearchBymd5(service, zoneTmp)
 				if err != nil {
 					continue
 				}
 				if sDTmp == nil {
-					glog.Errorf("find by md5 not found %s,%s,%s", service, zone, md5)
+					glog.Errorf("find by md5 not found %s,%s,%s", service, zoneTmp, md5)
 					continue
 				}
 				serviceDesc.Description = sDTmp.Description
