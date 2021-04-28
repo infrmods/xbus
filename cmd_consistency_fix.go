@@ -8,17 +8,20 @@ import (
 	"flag"
 	"fmt"
 	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/golang/glog"
 	"github.com/google/subcommands"
 	"github.com/infrmods/xbus/services"
 	"io"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
 var rServiceSplit = regexp.MustCompile(`/(.+)/(.+)/(.+)$`)
 
 const serviceDescNodeKey = "desc"
+const serviceKeyNodePrefix = "node_"
 
 // FixCmd run cmd
 type ConsistencyFixCmd struct {
@@ -64,11 +67,11 @@ func (cmd *ConsistencyFixCmd) action(db *sql.DB, etcdClient *clientv3.Client, ac
 	println(total)
 	dbServiceMap := make(map[string]string)
 	for start <= total {
-		if rows, err := db.Query(`select service, zone, typ, proto, description, proto_md5, status, md5_status from services
+		if rows, err := db.Query(`select service, zone, typ, proto, description, status, md5_status from services
 				order by create_time  desc limit ?,?`, start, 1000); err == nil {
 			for rows.Next() {
-				var service, zone, typ, proto, description, md5Str, status, md5Status string
-				if err := rows.Scan(&service, &zone, &typ, &proto, &description, &md5Str, &status, &md5Status); err != nil {
+				var service, zone, typ, proto, description, status, md5Status string
+				if err := rows.Scan(&service, &zone, &typ, &proto, &description, &status, &md5Status); err != nil {
 					glog.Errorf("get service data to variable failed: %v", err)
 					return subcommands.ExitSuccess
 				}
@@ -127,6 +130,110 @@ func (cmd *ConsistencyFixCmd) action(db *sql.DB, etcdClient *clientv3.Client, ac
 	return subcommands.ExitSuccess
 }
 
+func (cmd *ConsistencyFixCmd) etcdDescMd5Action(etcdClient *clientv3.Client, action string) subcommands.ExitStatus {
+	respServices, errServices := etcdClient.Get(context.Background(), "/services/", clientv3.WithPrefix(), clientv3.WithKeysOnly())
+	respMd5s, errMd5s := etcdClient.Get(context.Background(), "/services-md5s/", clientv3.WithPrefix(), clientv3.WithKeysOnly())
+	if errServices != nil {
+		glog.Errorf("get services fail: %v", errServices)
+		return subcommands.ExitSuccess
+	}
+	if errMd5s != nil {
+		glog.Errorf("get md5s fail: %v", errMd5s)
+		return subcommands.ExitSuccess
+	}
+
+	if strings.Contains(action, "desc-delete-error") {
+		cmd.deleteErrorMd5s(etcdClient, respMd5s.Kvs, action)
+		return subcommands.ExitSuccess
+	}
+
+	servicesMap := make(map[string]bool)
+	endpointsMap := make(map[string]string)
+	for _, kv := range respServices.Kvs {
+		serviceKey := string(kv.Key)
+		matches := rServiceSplit.FindAllStringSubmatch(serviceKey, -1)
+		suffix, zone := matches[0][3], matches[0][2]
+		if strings.HasPrefix(suffix, serviceKeyNodePrefix) {
+			service := strings.Split(matches[0][1], "/")[1]
+			endpointsMap[service+"/"+zone] = suffix
+			continue
+		}
+		if suffix != serviceDescNodeKey {
+			continue
+		}
+		service, zone := strings.Split(matches[0][1], "/")[1], matches[0][2]
+		servicesMap[service+"/"+zone] = true
+	}
+
+	deleteAction := "desc-delete"
+	splitAction := strings.Split(action, "-")
+	deleteLimit := -1
+	if len(splitAction) >= 3 {
+		deleteLimit, _ = strconv.Atoi(splitAction[2])
+	}
+
+	for _, kv := range respMd5s.Kvs {
+		md5Key := string(kv.Key)
+		matches := rServiceSplit.FindAllStringSubmatch(md5Key, -1)
+		service, zone := matches[0][3], matches[0][2]
+		serviceZoneKey := service + "/" + zone
+		exists := false
+		if _, exists = servicesMap[serviceZoneKey]; !exists {
+			//service desc不存在，但是md5s存在
+			if strings.Contains(action, deleteAction) && deleteLimit > 0 {
+				//判断是否存有在线节点
+				nodeStr := endpointsMap[serviceZoneKey]
+				glog.Infof("service desc not exists delete md5s: %s node: %s", md5Key, nodeStr)
+				if _, deleteErr := etcdClient.Delete(context.Background(), md5Key); deleteErr != nil {
+					glog.Errorf("delete  fail: %v", deleteErr)
+					return subcommands.ExitSuccess
+				}
+				deleteLimit--
+				if deleteLimit <= 0 {
+					return subcommands.ExitSuccess
+				}
+				continue
+			}
+		}
+		if !exists {
+			glog.Infof("service desc not exists: %s", md5Key)
+		}
+	}
+	return subcommands.ExitSuccess
+}
+
+func (cmd *ConsistencyFixCmd) deleteErrorMd5s(etcdClient *clientv3.Client, md5Kvs []*mvccpb.KeyValue, action string) {
+	splitAction := strings.Split(action, "-")
+	deleteLimit := -1
+	if len(splitAction) >= 4 {
+		deleteLimit, _ = strconv.Atoi(splitAction[3])
+	}
+	for _, kv := range md5Kvs {
+		md5Key := string(kv.Key)
+		matches := rServiceSplit.FindAllStringSubmatch(md5Key, -1)
+		service, zone := matches[0][3], matches[0][2]
+		wrongFormatFlag := !strings.Contains(service, ":") && strings.Contains(zone, ":")
+
+		if deleteLimit <= 0 && wrongFormatFlag {
+			glog.Infof("print md5s wrong format: %s", md5Key)
+			continue
+		}
+
+		//md5s格式错误的路径直接删除
+		if deleteLimit > 0 && wrongFormatFlag {
+			glog.Infof("delete md5s wrong format: %s", md5Key)
+			if _, deleteErr := etcdClient.Delete(context.Background(), md5Key); deleteErr != nil {
+				glog.Errorf("delete md5s wrong format fail: %v", deleteErr)
+				return
+			}
+			deleteLimit--
+			if deleteLimit <= 0 {
+				return
+			}
+		}
+	}
+}
+
 func (cmd *ConsistencyFixCmd) fixData(fixKey string, db *sql.DB, etcdClient *clientv3.Client) error {
 	resp, err := etcdClient.Get(context.Background(), fixKey)
 	if err != nil {
@@ -175,6 +282,9 @@ func (cmd *ConsistencyFixCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...i
 	fixStr := "修复，etcd存在的数据，数据库不存在，将etcd数据入库"
 	reverseStr := "反向比较，数据库存在，etcd不存在，只打印"
 	printStr := "打印etcd存在的数据，数据库不存在"
+	descStr := "打印etcd里services-md5s/zone/service存在，不存在service/zone/desc"
+	descDeleteStr := "清除etcd里services-md5s存在但是desc不存在的services-md5s路径(desc-delete-$count)"
+	descDeleErrorteStr := "清除etcd里services-md5s错误格式的path(desc-delete-error-$count)"
 	x := NewXBus()
 	db := x.NewDB()
 	etcdClient := x.Config.Etcd.NewEtcdClient()
@@ -190,8 +300,10 @@ func (cmd *ConsistencyFixCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...i
 		println("print")
 		return cmd.action(db, etcdClient, "print")
 
+	} else if strings.Contains(f.Arg(0), "desc") {
+		cmd.etcdDescMd5Action(etcdClient, f.Arg(0))
 	} else {
-		println(fmt.Sprintf("Args Support:\nprint: %s\nreverse: %s\nfix: %s\n", printStr, reverseStr, fixStr))
+		println(fmt.Sprintf("Args Support:\nprint: %s\nreverse: %s\nfix: %s\ndesc: %s\ndesc-delete: %s\ndesc-delete-error: %s\n", printStr, reverseStr, fixStr, descStr, descDeleteStr, descDeleErrorteStr))
 		return subcommands.ExitSuccess
 	}
 

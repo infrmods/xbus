@@ -81,10 +81,13 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 					endpoint.Address = ctrl.config.mapAddress(endpoint.Address, clientIP)
 					//matches := rServiceSplit.FindAllStringSubmatch(string(ev.Key), -1)
 					zone := matches[0][2]
-					serviceZone := zones[zone]
-					serviceZone.Endpoints = append(serviceZone.Endpoints, endpoint)
+					serviceZone, ok := zones[zone]
+					if ok {
+						serviceZone.Endpoints = append(serviceZone.Endpoints, endpoint)
+					} else {
+						glog.Warning("get serviceZone fail: ", matches[0][1], "/", zone)
+					}
 				}
-
 			}
 		}
 	}

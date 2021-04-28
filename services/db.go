@@ -121,7 +121,7 @@ func (ctrl *ServiceCtrl) SearchBymd5(service, zone string) (*ServiceDescV1, erro
 		for rows.Next() {
 			var service, zone, typ, proto, description, md5 string
 			if err := rows.Scan(&service, &zone, &typ, &proto, &description, &md5); err != nil {
-				glog.Errorf("query db services(%s) fail: %v", service, err)
+				glog.Errorf("query db services(%s %s) fail: %v", service, zone, err)
 				return nil, utils.NewError(utils.EcodeSystemError, "query db services fail")
 			}
 			return &ServiceDescV1{
