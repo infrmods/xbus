@@ -130,6 +130,39 @@ func (cmd *ConsistencyFixCmd) action(db *sql.DB, etcdClient *clientv3.Client, ac
 	return subcommands.ExitSuccess
 }
 
+func (cmd *ConsistencyFixCmd) descEmptyJson(etcdClient *clientv3.Client, action string) subcommands.ExitStatus {
+	respServices, err := etcdClient.Get(context.Background(), "/services/", clientv3.WithPrefix(), clientv3.WithKeysOnly())
+	if err != nil {
+		glog.Errorf("get services fail: %v", err)
+		return subcommands.ExitSuccess
+	}
+	actions := strings.Split(action, "-")
+	descCount := 0
+	if len(actions) > 2 {
+		descCount, _ = strconv.Atoi(actions[2])
+	}
+	for count, kv := range respServices.Kvs {
+		if count >= descCount {
+			return subcommands.ExitSuccess
+		}
+		serviceKey := string(kv.Key)
+		matches := rServiceSplit.FindAllStringSubmatch(serviceKey, -1)
+		suffix := matches[0][3]
+		if suffix != serviceDescNodeKey {
+			continue
+		}
+		//将desc的value设置为{}(空json串)
+		if strings.Contains(action, "empty-json") {
+			if _, err := etcdClient.Put(context.Background(), serviceKey, "{}"); err != nil {
+				glog.Errorf("empty-json error key: %s", serviceKey)
+				return subcommands.ExitSuccess
+			}
+			glog.Infof("set empty json desc key: %s", serviceKey)
+		}
+	}
+	return subcommands.ExitSuccess
+}
+
 func (cmd *ConsistencyFixCmd) etcdDescMd5Action(etcdClient *clientv3.Client, action string) subcommands.ExitStatus {
 	respServices, errServices := etcdClient.Get(context.Background(), "/services/", clientv3.WithPrefix(), clientv3.WithKeysOnly())
 	respMd5s, errMd5s := etcdClient.Get(context.Background(), "/services-md5s/", clientv3.WithPrefix(), clientv3.WithKeysOnly())
@@ -285,6 +318,7 @@ func (cmd *ConsistencyFixCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...i
 	descStr := "打印etcd里services-md5s/zone/service存在，不存在service/zone/desc"
 	descDeleteStr := "清除etcd里services-md5s存在但是desc不存在的services-md5s路径(desc-delete-$count)"
 	descDeleErrorteStr := "清除etcd里services-md5s错误格式的path(desc-delete-error-$count)"
+	descEmptyJsonStr := "将desc的value设置为空json串{}(empty-json-$count)"
 	x := NewXBus()
 	db := x.NewDB()
 	etcdClient := x.Config.Etcd.NewEtcdClient()
@@ -302,8 +336,10 @@ func (cmd *ConsistencyFixCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...i
 
 	} else if strings.Contains(f.Arg(0), "desc") {
 		cmd.etcdDescMd5Action(etcdClient, f.Arg(0))
+	} else if strings.Contains(f.Arg(0), "empty-json") {
+		return cmd.descEmptyJson(etcdClient, f.Arg(0))
 	} else {
-		println(fmt.Sprintf("Args Support:\nprint: %s\nreverse: %s\nfix: %s\ndesc: %s\ndesc-delete: %s\ndesc-delete-error: %s\n", printStr, reverseStr, fixStr, descStr, descDeleteStr, descDeleErrorteStr))
+		println(fmt.Sprintf("Args Support:\nprint: %s\nreverse: %s\nfix: %s\ndesc: %s\ndesc-delete: %s\ndesc-delete-error: %s\nempty-json: %s\n", printStr, reverseStr, fixStr, descStr, descDeleteStr, descDeleErrorteStr, descEmptyJsonStr))
 		return subcommands.ExitSuccess
 	}
 

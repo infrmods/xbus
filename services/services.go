@@ -202,11 +202,11 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 
 	for i := range descs {
 		desc := &descs[i]
-		descData, err := desc.Marshal()
+		//descData, err := desc.Marshal()
 		if err != nil {
 			return 0, err
 		}
-		descValue := string(descData)
+		//descValue := string(descData)
 		protoStr := desc.Proto
 		w := md5.New()
 		io.WriteString(w, protoStr)
@@ -215,12 +215,15 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 		protoMd5Key := ctrl.serviceM5NotifyKey(desc.Service, desc.Zone)
 		updateOps = append(updateOps,
 			clientv3.OpTxn(
-				[]clientv3.Cmp{clientv3.Compare(clientv3.Value(protoMd5Key), "=", desc.Md5)},
+				[]clientv3.Cmp{
+					clientv3.Compare(clientv3.Value(descKey), "!=", ""),
+					clientv3.Compare(clientv3.Value(protoMd5Key), "=", desc.Md5),
+				},
 				nil,
 				[]clientv3.Op{
 					clientv3.OpPut(protoMd5Key, desc.Md5),
-					clientv3.OpPut(descKey, descValue),
-					clientv3.OpPut(ctrl.serviceDescNotifyKey(desc.Service, desc.Zone), descValue),
+					clientv3.OpPut(descKey, "{}"),
+					//clientv3.OpPut(ctrl.serviceDescNotifyKey(desc.Service, desc.Zone), descValue),
 				},
 			))
 
@@ -245,9 +248,26 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 		glog.Errorf("update service db items fail: %v", err)
 		return 0, utils.NewError(utils.EcodeSystemError, "update db fail")
 	}
-	if _, err := ctrl.etcdClient.Txn(ctx).Then(updateOps...).Commit(); err != nil {
+	txResps, err := ctrl.etcdClient.Txn(ctx).Then(updateOps...).Commit()
+	if err != nil {
 		return 0, utils.CleanErr(err, "plug service fail",
 			"put services node fail: %v", err)
+	}
+	if txResps.Succeeded && endpoint != nil {
+		for index, resp := range txResps.Responses {
+			updateCount := len(resp.GetResponseTxn().Responses)
+			if index%2 == 0 && !resp.GetResponseTxn().Succeeded && updateCount < 2 {
+				service := ""
+				if len(descs) > index/2 {
+					v1 := descs[index/2]
+					service = v1.Service + "/" + v1.Zone
+				}
+				//偶数表示对md5,desc,descs进行更新，如果事务更新数量小于3，表示事务更新不完整
+				glog.Errorf("update md5s,desc,descs fail count %s less than 2,Service: %s Address: %s", updateCount, service, endpoint.Address)
+
+			}
+			//glog.Infof("Address: %s Success: %s, Size:%s", endpoint.Address, resp.GetResponseTxn().Succeeded, updateCount)
+		}
 	}
 	if err := ctrl.updateServiceDBItemsCommit(descs); err != nil {
 		glog.Errorf("update service db items fail: %v", err)
@@ -491,7 +511,7 @@ func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revi
 					continue
 				}
 				zoneTmp, service := matches[0][2], matches[0][3]
-				sDTmp, err := ctrl.SearchBymd5(service, zoneTmp)
+				sDTmp, err := ctrl.SearchByServiceZone(service, zoneTmp)
 				if err != nil {
 					continue
 				}

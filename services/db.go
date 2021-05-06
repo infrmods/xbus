@@ -113,8 +113,8 @@ func (ctrl *ServiceCtrl) SearchService(service string, skip int64, limit int64) 
 	return &result, nil
 }
 
-// SearchBymd5 search ServiceDescV1 via db
-func (ctrl *ServiceCtrl) SearchBymd5(service, zone string) (*ServiceDescV1, error) {
+// SearchByServiceZone search ServiceDescV1 via db
+func (ctrl *ServiceCtrl) SearchByServiceZone(service, zone string) (*ServiceDescV1, error) {
 	if rows, err := ctrl.db.Query(`select service, zone, typ, proto, description, proto_md5 from services where zone = ? 
 					and service = ? order by modify_time desc limit 0,1`, zone, service); err == nil {
 		defer rows.Close()

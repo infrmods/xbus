@@ -110,7 +110,7 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 		//getOps = append(getOps,
 		//	clientv3.OpGet(ctrl.serviceM5NotifyKey(strings.Split(matches[0][1], "/")[1], zone)))
 		service := strings.Split(matches[0][1], "/")[1]
-		serviceDesc, err := ctrl.SearchBymd5(service, zone)
+		serviceDesc, err := ctrl.SearchByServiceZone(service, zone)
 		if err != nil {
 			return nil, err
 		}
@@ -225,8 +225,8 @@ func (ctrl *ServiceCtrl) makeServiceBatch(ctx context.Context, clientIP net.IP, 
 				continue
 			}
 			zone, service := matches[0][2], matches[0][3]
-			//TODO batch use SearchOnlyBymd5s
-			serviceDesc, err := ctrl.SearchBymd5(service, zone)
+			//TODO batch use SearchByServiceZone
+			serviceDesc, err := ctrl.SearchByServiceZone(service, zone)
 			if err != nil {
 				return nil, err
 			}
