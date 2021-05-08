@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	v3rpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"io"
 	"net"
 	"regexp"
@@ -262,7 +263,7 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 					v1 := descs[index/2]
 					service = v1.Service + "/" + v1.Zone
 				}
-				//偶数表示对md5,desc,descs进行更新，如果事务更新数量小于3，表示事务更新不完整
+				//偶数表示对md5,desc,descs进行更新，如果事务更新数量小于2，表示事务更新不完整
 				glog.Errorf("update md5s,desc,descs fail count %s less than 2,Service: %s Address: %s", updateCount, service, endpoint.Address)
 
 			}
@@ -492,7 +493,13 @@ func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revi
 		if !ok {
 			return nil, nil
 		}
-		if resp.Err() != nil {
+		if err := resp.Err(); err != nil {
+			// if revision is compacted, return latest revision
+			if err == v3rpc.ErrCompacted {
+				glog.Warningf("services-md5s key with revision [%d] is compacted, call get instead", revision)
+				watchCh = watcher.Watch(ctx, prefix, clientv3.WithPrefix())
+				continue
+			}
 			return nil, utils.CleanErr(resp.Err(), "watch service desc fail", "watch service desc(zone:%s) fail: %v", zone, resp.Err())
 		}
 
