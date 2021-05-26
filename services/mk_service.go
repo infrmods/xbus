@@ -62,7 +62,7 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 	if len(getOps) > 0 {
 		resp, err := ctrl.etcdClient.Txn(context.TODO()).If().Then(getOps...).Commit()
 		if err != nil {
-			return nil, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", serviceKey, err)
+			return nil, utils.CleanErr(err, "query fail", "Query_makeService(%s) fail: %v", serviceKey, err)
 		}
 		for _, rp := range resp.Responses {
 			for _, ev := range rp.GetResponseRange().Kvs {
@@ -79,7 +79,6 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 						return nil, utils.NewError(utils.EcodeDamagedEndpointValue, "")
 					}
 					endpoint.Address = ctrl.config.mapAddress(endpoint.Address, clientIP)
-					//matches := rServiceSplit.FindAllStringSubmatch(string(ev.Key), -1)
 					zone := matches[0][2]
 					serviceZone, ok := zones[zone]
 					if ok {
@@ -92,7 +91,6 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 		}
 	}
 
-	//getOps = make([]clientv3.Op, 0)
 	for _, kv := range kvs {
 		matches := rServiceSplit.FindAllStringSubmatch(string(kv.Key), -1)
 		if len(matches) != 1 {
@@ -103,12 +101,6 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 			continue
 		}
 		zone := matches[0][2]
-		//serviceZone := zones[zone]
-		//if serviceZone == nil || len(serviceZone.Endpoints) == 0 {
-		//	continue
-		//}
-		//getOps = append(getOps,
-		//	clientv3.OpGet(ctrl.serviceM5NotifyKey(strings.Split(matches[0][1], "/")[1], zone)))
 		service := strings.Split(matches[0][1], "/")[1]
 		serviceDesc, err := ctrl.SearchByServiceZone(service, zone)
 		if err != nil {
@@ -126,23 +118,6 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 		serviceZone.Service = serviceKey
 		serviceZone.Zone = zone
 	}
-	//if len(getOps) > 0 {
-	//	resp, err := ctrl.etcdClient.Txn(context.TODO()).If().Then(getOps...).Commit()
-	//	if err != nil {
-	//		return nil, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", serviceKey, err)
-	//	}
-	//	for _, rp := range resp.Responses {
-	//		for _, ev := range rp.GetResponseRange().Kvs {
-	//			matches := rServiceSplit.FindAllStringSubmatch(string(ev.Key), -1)
-	//			if len(matches) != 1 {
-	//				continue
-	//			}
-	//			zone, service := matches[0][2], matches[0][3]
-	//			//TODO batch use SearchOnlyBymd5s
-	//
-	//		}
-	//	}
-	//}
 	return &ServiceV1{Service: serviceKey, Zones: zones}, nil
 }
 
@@ -171,7 +146,7 @@ func (ctrl *ServiceCtrl) makeServiceBatch(ctx context.Context, clientIP net.IP, 
 	if len(getOps) > 0 {
 		resp, err := ctrl.etcdClient.Txn(context.TODO()).If().Then(getOps...).Commit()
 		if err != nil {
-			return nil, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", serviceKey, err)
+			return nil, utils.CleanErr(err, "query fail", "Query_makeServiceBatch1(%s) fail: %v", serviceKey, err)
 		}
 		for _, rp := range resp.Responses {
 			for _, ev := range rp.GetResponseRange().Kvs {
@@ -203,10 +178,6 @@ func (ctrl *ServiceCtrl) makeServiceBatch(ctx context.Context, clientIP net.IP, 
 			continue
 		}
 		zone := matches[0][2]
-		//serviceZone := zones[zone]
-		//if serviceZone == nil || len(serviceZone.Endpoints) == 0 {
-		//	continue
-		//}
 		getOps = append(getOps,
 			clientv3.OpGet(ctrl.serviceM5NotifyKey(strings.Split(matches[0][1], "/")[1], zone)))
 	}
@@ -216,7 +187,7 @@ func (ctrl *ServiceCtrl) makeServiceBatch(ctx context.Context, clientIP net.IP, 
 	}
 	resp, err := ctrl.etcdClient.Txn(context.TODO()).If().Then(getOps...).Commit()
 	if err != nil {
-		return nil, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", serviceKey, err)
+		return nil, utils.CleanErr(err, "query fail", "Query_makeServiceBatch2(%s) fail: %v", serviceKey, err)
 	}
 	for _, rp := range resp.Responses {
 		for _, ev := range rp.GetResponseRange().Kvs {

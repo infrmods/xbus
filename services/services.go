@@ -249,26 +249,8 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 		glog.Errorf("update service db items fail: %v", err)
 		return 0, utils.NewError(utils.EcodeSystemError, "update db fail")
 	}
-	txResps, err := ctrl.etcdClient.Txn(ctx).Then(updateOps...).Commit()
-	if err != nil {
-		return 0, utils.CleanErr(err, "plug service fail",
-			"put services node fail: %v", err)
-	}
-	if txResps.Succeeded && endpoint != nil {
-		for index, resp := range txResps.Responses {
-			updateCount := len(resp.GetResponseTxn().Responses)
-			if index%2 == 0 && !resp.GetResponseTxn().Succeeded && updateCount < 2 {
-				service := ""
-				if len(descs) > index/2 {
-					v1 := descs[index/2]
-					service = v1.Service + "/" + v1.Zone
-				}
-				//偶数表示对md5,desc,descs进行更新，如果事务更新数量小于2，表示事务更新不完整
-				glog.Errorf("update md5s,desc,descs fail count %s less than 2,Service: %s Address: %s", updateCount, service, endpoint.Address)
-
-			}
-			//glog.Infof("Address: %s Success: %s, Size:%s", endpoint.Address, resp.GetResponseTxn().Succeeded, updateCount)
-		}
+	if _, err := ctrl.etcdClient.Txn(ctx).Then(updateOps...).Commit(); err != nil {
+		return 0, utils.CleanErr(err, "plug service fail", "put services node fail: %v", err)
 	}
 	if err := ctrl.updateServiceDBItemsCommit(descs); err != nil {
 		glog.Errorf("update service db items fail: %v", err)
@@ -385,7 +367,7 @@ func (ctrl *ServiceCtrl) QueryZones(ctx context.Context, clientIP net.IP, servic
 	resp, err := ctrl.etcdClient.Get(ctx, serviceKey, clientv3.WithPrefix(), clientv3.WithKeysOnly())
 
 	if err != nil {
-		return nil, 0, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", service, err)
+		return nil, 0, utils.CleanErr(err, "query fail", "Query_QueryZones(%s) fail: %v", service, err)
 	}
 
 	if len(resp.Kvs) == 0 {
@@ -410,7 +392,7 @@ func (ctrl *ServiceCtrl) _queryBack(ctx context.Context, clientIP net.IP, servic
 	key := ctrl.serviceEntryPrefix(serviceKey)
 	resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix())
 	if err != nil {
-		return nil, 0, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", key, err)
+		return nil, 0, utils.CleanErr(err, "query fail", "Query_queryBack(%s) fail: %v", key, err)
 	}
 
 	if len(resp.Kvs) == 0 {
@@ -430,7 +412,7 @@ func (ctrl *ServiceCtrl) _query(ctx context.Context, clientIP net.IP, serviceKey
 	}
 	resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix(), clientv3.WithKeysOnly())
 	if err != nil {
-		return nil, 0, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", key, err)
+		return nil, 0, utils.CleanErr(err, "query fail", "Query_query(%s) fail: %v", key, err)
 	}
 
 	if len(resp.Kvs) == 0 {
@@ -506,7 +488,7 @@ func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revi
 		events := make([]ServiceDescEvent, 0, 8)
 		for _, event := range resp.Events {
 			var eventType string
-			var serviceDesc ServiceDescV1 = ServiceDescV1{}
+			var serviceDesc = ServiceDescV1{}
 			var md5 string
 
 			if event.Type == clientv3.EventTypePut {
@@ -623,7 +605,7 @@ func (ctrl *ServiceCtrl) Delete(ctx context.Context, serviceKey string, zone str
 			_, err := ctrl.etcdClient.Txn(ctx).Then([]clientv3.Op{
 				clientv3.OpDelete(ctrl.serviceDescKey(serviceKey, zone)),
 				clientv3.OpDelete(ctrl.serviceDescNotifyKey(serviceKey, zone)),
-				clientv3.OpDelete(ctrl.serviceM5NotifyKey(zone, serviceKey)),
+				clientv3.OpDelete(ctrl.serviceM5NotifyKey(serviceKey, zone)),
 			}...).Commit()
 			if err != nil {
 				return utils.CleanErr(err, "delete service keys fail", "delete service keys(%s) fail: %v", entryPrefix, err)
