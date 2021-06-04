@@ -206,3 +206,5 @@ alter table services modify `extension` varchar(16) DEFAULT NULL;
 alter table services modify `proto` longtext COMMENT '服务元信息';
 alter table services modify `service` varchar(240) DEFAULT NULL COMMENT '服务id' collate utf8_bin;
 alter table services modify `zone` varchar(64) NOT NULL DEFAULT 'default' COMMENT '逻辑zone' collate utf8_bin;
+alter table app_config_states modify `config_name` varchar(128) NOT NULL COMMENT '配置名称';
+
