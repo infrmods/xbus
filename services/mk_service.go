@@ -107,7 +107,7 @@ func (ctrl *ServiceCtrl) makeService(ctx context.Context, clientIP net.IP, servi
 			return nil, err
 		}
 		if serviceDesc == nil {
-			glog.Errorf("find by md5 not found %s,%s", service, zone)
+			glog.Errorf("find by serviceZone not found %s,%s", service, zone)
 			continue
 		}
 		serviceZone := zones[zone]
@@ -202,7 +202,7 @@ func (ctrl *ServiceCtrl) makeServiceBatch(ctx context.Context, clientIP net.IP, 
 				return nil, err
 			}
 			if serviceDesc == nil {
-				glog.Errorf("find by md5 not found %s,%s,%s", service, zone, string(ev.Value))
+				glog.Errorf("find by serviceZone not found %s,%s,%s", service, zone, string(ev.Value))
 				continue
 			}
 			serviceZone := zones[zone]

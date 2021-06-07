@@ -505,7 +505,7 @@ func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revi
 					continue
 				}
 				if sDTmp == nil {
-					glog.Errorf("find by md5 not found %s,%s,%s", service, zoneTmp, md5)
+					glog.Errorf("find by serviceZone not found %s,%s,%s", service, zoneTmp, md5)
 					continue
 				}
 				serviceDesc.Description = sDTmp.Description
