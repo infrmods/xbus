@@ -198,3 +198,12 @@ CREATE TABLE `services` (
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2018-05-06 22:48:47
+
+alter table services add `proto_md5` varchar(64) DEFAULT NULL;
+alter table services add `md5_status` tinyint(1) DEFAULT '1';
+alter table services add KEY `MD5_INDEX` (`proto_md5`);
+alter table services modify `extension` varchar(16) DEFAULT NULL;
+alter table services modify `proto` longtext COMMENT '服务元信息';
+alter table services modify `service` varchar(240) DEFAULT NULL COMMENT '服务id' collate utf8_bin;
+alter table services modify `zone` varchar(64) NOT NULL DEFAULT 'default' COMMENT '逻辑zone' collate utf8_bin;
+alter table app_config_states modify `config_name` varchar(128) NOT NULL COMMENT '配置名称';

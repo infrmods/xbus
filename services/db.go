@@ -81,6 +81,9 @@ type SearchResultV1 struct {
 
 // SearchService search service via db
 func (ctrl *ServiceCtrl) SearchService(service string, skip int64, limit int64) (*SearchResultV1, error) {
+	if limit-skip > 5000 {
+		return nil, utils.NewError(utils.EcodeSystemError, "query db services fail: count more than 5000!")
+	}
 	like := "%" + service + "%"
 	var total int64
 	if err := dbutil.Query(ctrl.db, &total, `select count(*) from services where status=? and md5_status=1 and service like ?`, serviceStatusOk, like); err != nil {
@@ -91,7 +94,7 @@ func (ctrl *ServiceCtrl) SearchService(service string, skip int64, limit int64) 
 	result := SearchResultV1{Services: make([]ServiceItemV1, 0, limit), Total: total}
 	if total > skip {
 		if rows, err := ctrl.db.Query(`select service, zone, typ from services where status=? and md5_status=1 and service like ?
-				order by modify_time desc limit ?,?`, serviceStatusOk, like, skip, limit); err == nil {
+				order by create_time desc limit ?,?`, serviceStatusOk, like, skip, limit); err == nil {
 			defer rows.Close()
 			for rows.Next() {
 				var service, zone, typ string
@@ -110,15 +113,15 @@ func (ctrl *ServiceCtrl) SearchService(service string, skip int64, limit int64) 
 	return &result, nil
 }
 
-// SearchBymd5 search ServiceDescV1 via db
-func (ctrl *ServiceCtrl) SearchBymd5(service, md5 string) (*ServiceDescV1, error) {
-	if rows, err := ctrl.db.Query(`select service, zone, typ, proto, description, proto_md5 from services where proto_md5 = ? 
-					and service = ? order by modify_time desc limit 0,1`, md5, service); err == nil {
+// SearchByServiceZone search ServiceDescV1 via db
+func (ctrl *ServiceCtrl) SearchByServiceZone(service, zone string) (*ServiceDescV1, error) {
+	if rows, err := ctrl.db.Query(`select service, zone, typ, proto, description, proto_md5 from services where zone = ? 
+					and service = ? order by modify_time desc limit 0,1`, zone, service); err == nil {
 		defer rows.Close()
 		for rows.Next() {
 			var service, zone, typ, proto, description, md5 string
 			if err := rows.Scan(&service, &zone, &typ, &proto, &description, &md5); err != nil {
-				glog.Errorf("query db services(%s) fail: %v", service, err)
+				glog.Errorf("query db services(%s %s) fail: %v", service, zone, err)
 				return nil, utils.NewError(utils.EcodeSystemError, "query db services fail")
 			}
 			return &ServiceDescV1{
@@ -131,7 +134,7 @@ func (ctrl *ServiceCtrl) SearchBymd5(service, md5 string) (*ServiceDescV1, error
 				nil
 		}
 	} else {
-		glog.Errorf("query db services(%s) fail: %v", md5, err)
+		glog.Errorf("query db services(%s %s) fail: %v", service, zone, err)
 		return nil, utils.NewError(utils.EcodeSystemError, "query db services fail")
 	}
 	return nil, nil

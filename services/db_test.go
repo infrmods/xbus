@@ -35,9 +35,9 @@ func TestSearchService(t *testing.T) {
 	}
 	db.SetMaxOpenConns(1)
 	services := &ServiceCtrl{config: Config{}, db: db, etcdClient: nil, ProtoSwitch: false}
-	md5 := "9faac8e101df0d700dbf9bf7fdec2770"
+	zone := "default"
 	service := "sktest.Java5:1.0"
-	result, err := services.SearchBymd5(service, md5)
+	result, err := services.SearchByServiceZone(service, zone)
 	if err != nil {
 		t.Errorf("fail: %v", err)
 	} else {

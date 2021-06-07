@@ -76,27 +76,9 @@ func NewServer(config *Config, etcdClient *clientv3.Client,
 	servs *services.ServiceCtrl, cfgs *configs.ConfigCtrl, apps *apps.AppCtrl) *Server {
 	server := &Server{config: *config, tls: config.CertFile != "",
 		etcdClient: etcdClient,
-		services:   servs, configs: cfgs, apps: apps, e: echo.New(), ProtoSwitch: false}
+		services:   servs, configs: cfgs, apps: apps, e: echo.New(), ProtoSwitch: true}
 	server.services.ProtoSwitch = server.ProtoSwitch
 	server.prepare()
-	go func() {
-		for {
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-			protoSwitch := "/xbus/proto/switch"
-			resp, err := server.etcdClient.Get(ctx, protoSwitch)
-			if err != nil {
-				glog.Infof("get proto switch fail %v", err)
-				server.ProtoSwitch = false
-				server.services.ProtoSwitch = server.ProtoSwitch
-			} else {
-				server.ProtoSwitch = len(resp.Kvs) == 0
-				server.services.ProtoSwitch = server.ProtoSwitch
-			}
-			cancel()
-			glog.Infof("current proto switch statue %v", server.ProtoSwitch)
-			time.Sleep(time.Duration(5) * time.Second)
-		}
-	}()
 	return server
 }
 
@@ -218,7 +200,7 @@ func (server *Server) verifyApp(h echo.HandlerFunc) echo.HandlerFunc {
 				return JSONErrorC(c, http.StatusServiceUnavailable,
 					utils.Errorf(utils.EcodeSystemError, "get app fail"))
 			} else if app == nil {
-				glog.V(1).Infof("no such app: %s", appName)
+				glog.V(1).Infof("no such app: %s [url: %s,remoteIp: %s]", appName, req.URL.Path, req.RemoteAddr)
 			} else {
 				c.Set("app", app)
 				c.Set("groupIds", groupIds)

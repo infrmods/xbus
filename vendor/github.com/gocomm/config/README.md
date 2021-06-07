@@ -1,2 +1,0 @@
-# config
-read config

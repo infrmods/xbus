@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"os"
-
 	"github.com/coreos/etcd/clientv3"
 	"github.com/gocomm/config"
 	"github.com/golang/glog"
@@ -15,7 +13,10 @@ import (
 	"github.com/infrmods/xbus/configs"
 	"github.com/infrmods/xbus/services"
 	"github.com/infrmods/xbus/utils"
+	"github.com/xuri/glc"
 	"gopkg.in/yaml.v2"
+	"os"
+	"time"
 
 	_ "github.com/gocomm/dbutil/dialects/mysql"
 )
@@ -27,6 +28,7 @@ type Config struct {
 	Configs  configs.Config
 	Apps     apps.Config
 	API      api.Config
+	Logs     string
 
 	DB struct {
 		Driver  string `default:"mysql"`
@@ -87,12 +89,28 @@ func main() {
 	subcommands.Register(&RunCmd{}, "")
 	subcommands.Register(&GenRootCmd{}, "")
 	subcommands.Register(&FixCmd{}, "")
+	subcommands.Register(&ConsistencyFixCmd{}, "")
 	subcommands.Register(&ListGroupCmd{}, "")
 	subcommands.Register(&ListPermCmd{}, "")
 	subcommands.Register(&GrantCmd{}, "")
 	subcommands.Register(&KeyCertCmd{}, "")
 
-	flag.Set("logtostderr", "true")
+	//flag.Set("logtostderr", "true")
+	//flag.Parse()
+	logsPath := NewXBus().Config.Logs
+	flag.Set("alsologtostderr", "true")
+	flag.Set("log_dir", logsPath)
 	flag.Parse()
+	// 退出前执行，清空缓存区，将日志写入文件
+	defer glog.Flush()
+	glog.MaxSize = 1024 * 1024 * 10
+	glog.Infof("logs path: %s", logsPath)
+	//每10分钟清理日志，仅保留20分钟内回滚指定目录下以xbus作前缀由 glog 产生的日志
+	glc.NewGLC(glc.InitOption{
+		Path:     logsPath + "/",
+		Prefix:   `xbus`,
+		Interval: time.Minute * 10,
+		Reserve:  time.Minute * 20,
+	})
 	subcommands.Execute(context.Background())
 }

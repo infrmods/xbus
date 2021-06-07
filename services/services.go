@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	v3rpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"io"
 	"net"
 	"regexp"
@@ -202,11 +203,11 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 
 	for i := range descs {
 		desc := &descs[i]
-		descData, err := desc.Marshal()
+		//descData, err := desc.Marshal()
 		if err != nil {
 			return 0, err
 		}
-		descValue := string(descData)
+		//descValue := string(descData)
 		protoStr := desc.Proto
 		w := md5.New()
 		io.WriteString(w, protoStr)
@@ -215,12 +216,15 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 		protoMd5Key := ctrl.serviceM5NotifyKey(desc.Service, desc.Zone)
 		updateOps = append(updateOps,
 			clientv3.OpTxn(
-				[]clientv3.Cmp{clientv3.Compare(clientv3.Value(protoMd5Key), "=", desc.Md5)},
+				[]clientv3.Cmp{
+					clientv3.Compare(clientv3.Value(descKey), "!=", ""),
+					clientv3.Compare(clientv3.Value(protoMd5Key), "=", desc.Md5),
+				},
 				nil,
 				[]clientv3.Op{
 					clientv3.OpPut(protoMd5Key, desc.Md5),
-					clientv3.OpPut(descKey, descValue),
-					clientv3.OpPut(ctrl.serviceDescNotifyKey(desc.Service, desc.Zone), descValue),
+					clientv3.OpPut(descKey, "{}"),
+					//clientv3.OpPut(ctrl.serviceDescNotifyKey(desc.Service, desc.Zone), descValue),
 				},
 			))
 
@@ -246,8 +250,7 @@ func (ctrl *ServiceCtrl) PlugAll(ctx context.Context,
 		return 0, utils.NewError(utils.EcodeSystemError, "update db fail")
 	}
 	if _, err := ctrl.etcdClient.Txn(ctx).Then(updateOps...).Commit(); err != nil {
-		return 0, utils.CleanErr(err, "plug service fail",
-			"put services node fail: %v", err)
+		return 0, utils.CleanErr(err, "plug service fail", "put services node fail: %v", err)
 	}
 	if err := ctrl.updateServiceDBItemsCommit(descs); err != nil {
 		glog.Errorf("update service db items fail: %v", err)
@@ -348,7 +351,9 @@ func (ctrl *ServiceCtrl) Query(ctx context.Context, clientIP net.IP, service str
 	if err := checkService(service); err != nil {
 		return nil, 0, err
 	}
-
+	if ctrl.ProtoSwitch {
+		return ctrl._query(ctx, clientIP, service)
+	}
 	return ctrl._queryBack(ctx, clientIP, service)
 }
 
@@ -362,7 +367,7 @@ func (ctrl *ServiceCtrl) QueryZones(ctx context.Context, clientIP net.IP, servic
 	resp, err := ctrl.etcdClient.Get(ctx, serviceKey, clientv3.WithPrefix(), clientv3.WithKeysOnly())
 
 	if err != nil {
-		return nil, 0, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", service, err)
+		return nil, 0, utils.CleanErr(err, "query fail", "Query_QueryZones(%s) fail: %v", service, err)
 	}
 
 	if len(resp.Kvs) == 0 {
@@ -387,7 +392,7 @@ func (ctrl *ServiceCtrl) _queryBack(ctx context.Context, clientIP net.IP, servic
 	key := ctrl.serviceEntryPrefix(serviceKey)
 	resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix())
 	if err != nil {
-		return nil, 0, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", key, err)
+		return nil, 0, utils.CleanErr(err, "query fail", "Query_queryBack(%s) fail: %v", key, err)
 	}
 
 	if len(resp.Kvs) == 0 {
@@ -407,7 +412,7 @@ func (ctrl *ServiceCtrl) _query(ctx context.Context, clientIP net.IP, serviceKey
 	}
 	resp, err := ctrl.etcdClient.Get(ctx, key, clientv3.WithPrefix(), clientv3.WithKeysOnly())
 	if err != nil {
-		return nil, 0, utils.CleanErr(err, "query fail", "Query(%s) fail: %v", key, err)
+		return nil, 0, utils.CleanErr(err, "query fail", "Query_query(%s) fail: %v", key, err)
 	}
 
 	if len(resp.Kvs) == 0 {
@@ -470,14 +475,20 @@ func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revi
 		if !ok {
 			return nil, nil
 		}
-		if resp.Err() != nil {
+		if err := resp.Err(); err != nil {
+			// if revision is compacted, return latest revision
+			if err == v3rpc.ErrCompacted {
+				glog.Warningf("services-md5s key with revision [%d] is compacted, call get instead", revision)
+				watchCh = watcher.Watch(ctx, prefix, clientv3.WithPrefix())
+				continue
+			}
 			return nil, utils.CleanErr(resp.Err(), "watch service desc fail", "watch service desc(zone:%s) fail: %v", zone, resp.Err())
 		}
 
 		events := make([]ServiceDescEvent, 0, 8)
 		for _, event := range resp.Events {
 			var eventType string
-			var serviceDesc ServiceDescV1 = ServiceDescV1{}
+			var serviceDesc = ServiceDescV1{}
 			var md5 string
 
 			if event.Type == clientv3.EventTypePut {
@@ -488,13 +499,13 @@ func (ctrl *ServiceCtrl) WatchServiceDesc(ctx context.Context, zone string, revi
 					glog.Warningf("got unexpected service node: %s", string(event.Kv.Key))
 					continue
 				}
-				service := matches[0][3]
-				sDTmp, err := ctrl.SearchBymd5(service, md5)
+				zoneTmp, service := matches[0][2], matches[0][3]
+				sDTmp, err := ctrl.SearchByServiceZone(service, zoneTmp)
 				if err != nil {
 					continue
 				}
 				if sDTmp == nil {
-					glog.Errorf("find by md5 not found %s,%s", service, md5)
+					glog.Errorf("find by serviceZone not found %s,%s,%s", service, zoneTmp, md5)
 					continue
 				}
 				serviceDesc.Description = sDTmp.Description
@@ -594,7 +605,7 @@ func (ctrl *ServiceCtrl) Delete(ctx context.Context, serviceKey string, zone str
 			_, err := ctrl.etcdClient.Txn(ctx).Then([]clientv3.Op{
 				clientv3.OpDelete(ctrl.serviceDescKey(serviceKey, zone)),
 				clientv3.OpDelete(ctrl.serviceDescNotifyKey(serviceKey, zone)),
-				clientv3.OpDelete(ctrl.serviceM5NotifyKey(zone, serviceKey)),
+				clientv3.OpDelete(ctrl.serviceM5NotifyKey(serviceKey, zone)),
 			}...).Commit()
 			if err != nil {
 				return utils.CleanErr(err, "delete service keys fail", "delete service keys(%s) fail: %v", entryPrefix, err)

@@ -7,7 +7,6 @@ import (
 	"github.com/golang/glog"
 	"os"
 	"time"
-
 )
 
 // ETCDConfig etcd config
@@ -32,9 +31,11 @@ func (etcd *ETCDConfig) NewEtcdClient() *clientv3.Client {
 		tlsConfig = &tls.Config{RootCAs: pool}
 	}
 	etcdConfig := clientv3.Config{
-		Endpoints:   etcd.Endpoints,
-		DialTimeout: etcd.Timeout,
-		TLS:         tlsConfig}
+		Endpoints:         etcd.Endpoints,
+		DialTimeout:       etcd.Timeout,
+		TLS:               tlsConfig,
+		DialKeepAliveTime: time.Second * 10,
+	}
 	etcdClient, err := clientv3.New(etcdConfig)
 	if err != nil {
 		glog.Errorf("create etcd clientv3 fail: %v", err)
